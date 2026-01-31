@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useLogs, Log } from '@/hooks/useLogs';
 import { useTitlesContext } from '@/contexts/TitlesContext';
 import { LogItem } from '@/components/LogItem';
@@ -62,7 +62,89 @@ function groupLogsByDate(logs: Log[]): Map<string, Log[]> {
   return groups;
 }
 
-function getLogsWithGaps(dayLogs: Log[], minGapMinutes: number = 1): (Log | Gap)[] {
+interface DaySection {
+  dateKey: string;
+  dateLabel: string;
+  logs: Log[];
+  date: Date;
+}
+
+function generateDaySections(logs: Log[]): DaySection[] {
+  if (logs.length === 0) return [];
+  
+  const sections: DaySection[] = [];
+  const logsByDate = groupLogsByDate(logs);
+  
+  // Find the date range (earliest log to today)
+  const sortedDates = Array.from(logsByDate.keys()).sort();
+  const earliestDateKey = sortedDates[0];
+  const [ey, em, ed] = earliestDateKey.split('-').map(Number);
+  const earliestDate = new Date(ey, em, ed);
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Iterate from today backwards to earliest date
+  const current = new Date(today);
+  
+  while (current >= earliestDate) {
+    const dateKey = getDateKey(current.toISOString());
+    const dayLogs = logsByDate.get(dateKey) || [];
+    
+    sections.push({
+      dateKey,
+      dateLabel: getSectionTitle(current.toISOString()),
+      logs: dayLogs,
+      date: new Date(current),
+    });
+    
+    current.setDate(current.getDate() - 1);
+  }
+  
+  return sections;
+}
+
+function getLogsWithGaps(
+  dayLogs: Log[], 
+  allLogs: Log[], 
+  dateKey: string, 
+  minGapMinutes: number = 1
+): (Log | Gap)[] {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const dayStart = new Date(year, month, day, 0, 0, 0, 0);
+  const dayEnd = new Date(year, month, day, 23, 59, 59, 999);
+  
+  // Find overnight log from previous day extending into this day
+  const overnightLog = allLogs.find(log => {
+    const logStart = new Date(log.start_time);
+    const logEnd = new Date(logStart.getTime() + log.duration * 1000);
+    const logDateKey = getDateKey(log.start_time);
+    
+    return logDateKey !== dateKey && 
+           logStart < dayStart && 
+           logEnd > dayStart;
+  });
+  
+  // Effective day start (after overnight log ends, if any)
+  let effectiveDayStart = dayStart;
+  if (overnightLog) {
+    const overnightEnd = new Date(
+      new Date(overnightLog.start_time).getTime() + overnightLog.duration * 1000
+    );
+    if (overnightEnd > dayStart) {
+      effectiveDayStart = overnightEnd;
+    }
+  }
+  
+  // If no logs for this day, return single full-day gap
+  if (dayLogs.length === 0) {
+    return [{
+      startTime: effectiveDayStart,
+      endTime: dayEnd,
+      duration: Math.floor((dayEnd.getTime() - effectiveDayStart.getTime()) / 1000),
+    }];
+  }
+  
   const items: (Log | Gap)[] = [];
   
   // Sort by start_time descending (most recent first)
@@ -70,6 +152,7 @@ function getLogsWithGaps(dayLogs: Log[], minGapMinutes: number = 1): (Log | Gap)
     new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
   );
   
+  // Process gaps between consecutive logs
   for (let i = 0; i < sorted.length; i++) {
     const current = sorted[i];
     items.push(current);
@@ -92,6 +175,21 @@ function getLogsWithGaps(dayLogs: Log[], minGapMinutes: number = 1): (Log | Gap)
     }
   }
   
+  // Check for gap at the start of day (before first log)
+  const earliestLog = sorted[sorted.length - 1];
+  const earliestLogStart = new Date(earliestLog.start_time);
+  
+  const startGapMs = earliestLogStart.getTime() - effectiveDayStart.getTime();
+  const startGapMinutes = startGapMs / (1000 * 60);
+  
+  if (startGapMinutes >= minGapMinutes) {
+    items.push({
+      startTime: effectiveDayStart,
+      endTime: earliestLogStart,
+      duration: Math.floor(startGapMs / 1000),
+    });
+  }
+  
   return items;
 }
 
@@ -104,6 +202,8 @@ export function LogsTab() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [gapStartTime, setGapStartTime] = useState<string | undefined>(undefined);
   const [gapEndTime, setGapEndTime] = useState<string | undefined>(undefined);
+
+  const daySections = useMemo(() => generateDaySections(logs), [logs]);
 
   const handleEditClick = (log: Log) => {
     setSelectedLog(log);
@@ -155,21 +255,21 @@ export function LogsTab() {
   return (
     <div className="flex-1 overflow-auto px-4 py-4">
       <div className="space-y-6">
-        {Array.from(groupLogsByDate(logs).entries()).map(([dateKey, dayLogs]) => (
-          <div key={dateKey}>
+        {daySections.map((section) => (
+          <div key={section.dateKey}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-medium text-muted-foreground">
-                {getSectionTitle(dayLogs[0].start_time)}
+                {section.dateLabel}
               </h3>
               <button
-                onClick={() => handleAddClick(new Date(dayLogs[0].start_time))}
+                onClick={() => handleAddClick(section.date)}
                 className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
               >
                 <Plus className="h-4 w-4" />
               </button>
             </div>
             <div className="space-y-3">
-              {getLogsWithGaps(dayLogs).map((item) => (
+              {getLogsWithGaps(section.logs, logs, section.dateKey).map((item) => (
                 isGap(item) ? (
                   <GapItem
                     key={`gap-${item.startTime.getTime()}`}

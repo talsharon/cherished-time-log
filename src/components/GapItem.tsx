@@ -23,6 +23,15 @@ function formatTimeRange(startTime: Date, endTime: Date): string {
   const startStr = startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const endStr = endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   
+  // Check if gap spans to next day(s)
+  const startDate = new Date(startTime.getFullYear(), startTime.getMonth(), startTime.getDate());
+  const endDate = new Date(endTime.getFullYear(), endTime.getMonth(), endTime.getDate());
+  const daysDiff = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (daysDiff > 0) {
+    return `${startStr} - ${endStr} (+${daysDiff})`;
+  }
+  
   return `${startStr} - ${endStr}`;
 }
 
