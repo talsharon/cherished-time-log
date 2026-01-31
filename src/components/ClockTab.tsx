@@ -44,12 +44,18 @@ function formatTimeRange(startTime: string, durationSeconds: number): string {
 }
 
 export function ClockTab() {
-  const { startTime, loading: sessionLoading, resetSession } = useActiveSession();
+  const { 
+    startTime, 
+    currentTitle, 
+    currentComment, 
+    loading: sessionLoading, 
+    resetSession,
+    updateTitle,
+    updateComment 
+  } = useActiveSession();
   const { logs, createLog } = useLogs();
   const { titles, getColorForTitle, createTitle } = useTitles();
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedTitle, setSelectedTitle] = useState('Idle');
-  const [comment, setComment] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [isNewTitleDialogOpen, setIsNewTitleDialogOpen] = useState(false);
   const [animatingLogId, setAnimatingLogId] = useState<string | null>(null);
@@ -72,14 +78,14 @@ export function ClockTab() {
     if (value === CREATE_NEW_VALUE) {
       setIsNewTitleDialogOpen(true);
     } else {
-      setSelectedTitle(value);
+      updateTitle(value);
     }
   };
 
   const handleCreateNewTitle = async () => {
     if (!newTitle.trim()) return;
     await createTitle(newTitle.trim());
-    setSelectedTitle(newTitle.trim());
+    updateTitle(newTitle.trim());
     setNewTitle('');
     setIsNewTitleDialogOpen(false);
   };
@@ -96,16 +102,14 @@ export function ClockTab() {
       const duration = getElapsedSeconds(startTime);
       
       // Create the log entry with selected title and comment
-      await createLog(startTime, duration, selectedTitle, comment || undefined);
+      await createLog(startTime, duration, currentTitle, currentComment || undefined);
       
       // Trigger slide-in animation for new log
       // The new log will be at logs[0] after refetch
       setAnimatingLogId('new');
       
-      // Reset the session and form
+      // Reset the session (clears title and comment in DB)
       await resetSession();
-      setSelectedTitle('Idle');
-      setComment('');
       
       toast.success('Activity logged!');
     } catch (error) {
@@ -133,7 +137,7 @@ export function ClockTab() {
       <div className="w-full space-y-4 mb-8">
         <div className="space-y-2">
           <Label className="text-base font-medium text-muted-foreground">What are you up to?</Label>
-          <Select value={selectedTitle} onValueChange={handleTitleChange}>
+          <Select value={currentTitle} onValueChange={handleTitleChange}>
             <SelectTrigger className="h-12">
               <SelectValue placeholder="Select activity" />
             </SelectTrigger>
@@ -170,8 +174,8 @@ export function ClockTab() {
 
         <Input
           placeholder="Add a comment..."
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
+          value={currentComment}
+          onChange={(e) => updateComment(e.target.value)}
           className="h-12"
         />
       </div>

@@ -17,19 +17,25 @@ export type Database = {
       active_sessions: {
         Row: {
           created_at: string
+          current_comment: string | null
           current_start_time: string
+          current_title: string
           id: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          current_comment?: string | null
           current_start_time?: string
+          current_title?: string
           id?: string
           user_id: string
         }
         Update: {
           created_at?: string
+          current_comment?: string | null
           current_start_time?: string
+          current_title?: string
           id?: string
           user_id?: string
         }
