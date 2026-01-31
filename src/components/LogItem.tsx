@@ -1,11 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Log } from '@/hooks/useLogs';
-import { useTitles } from '@/hooks/useTitles';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useTitlesContext } from '@/contexts/TitlesContext';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,11 +11,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Check, X, Trash2, Loader2 } from 'lucide-react';
+import { Trash2, Loader2 } from 'lucide-react';
 
 interface LogItemProps {
   log: Log;
-  onUpdate: (id: string, updates: { title?: string; comment?: string; start_time?: string; duration?: number }) => Promise<void>;
+  onEdit: (log: Log) => void;
   onDelete: (id: string) => Promise<void>;
 }
 
@@ -44,84 +39,12 @@ function formatTimeRange(startTime: string, durationSeconds: number): string {
   return `${startStr} - ${endStr}`;
 }
 
-function formatTimeForInput(date: Date): string {
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  return `${hours}:${minutes}`;
-}
-
-function parseTimeInput(baseDate: Date, timeStr: string): Date {
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const result = new Date(baseDate);
-  result.setHours(hours, minutes, 0, 0);
-  return result;
-}
-
-export function LogItem({ log, onUpdate, onDelete }: LogItemProps) {
-  const { titles, getColorForTitle, createTitle } = useTitles();
-  const [isOpen, setIsOpen] = useState(false);
-  const [editTitle, setEditTitle] = useState(log.title);
-  const [editComment, setEditComment] = useState(log.comment || '');
-  const [newTitle, setNewTitle] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+export function LogItem({ log, onEdit, onDelete }: LogItemProps) {
+  const { getColorForTitle } = useTitlesContext();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [editStartTime, setEditStartTime] = useState('');
-  const [editEndTime, setEditEndTime] = useState('');
-  const [timeError, setTimeError] = useState<string | null>(null);
 
   const titleColor = getColorForTitle(log.title);
-
-  useEffect(() => {
-    if (isOpen) {
-      const start = new Date(log.start_time);
-      const end = new Date(start.getTime() + log.duration * 1000);
-      setEditStartTime(formatTimeForInput(start));
-      setEditEndTime(formatTimeForInput(end));
-      setTimeError(null);
-    }
-  }, [isOpen, log.start_time, log.duration]);
-
-  const handleSave = async () => {
-    // Validate times
-    const baseDate = new Date(log.start_time);
-    const newStart = parseTimeInput(baseDate, editStartTime);
-    const newEnd = parseTimeInput(baseDate, editEndTime);
-    
-    if (newEnd <= newStart) {
-      setTimeError('End time must be after start time');
-      return;
-    }
-    
-    setIsSaving(true);
-    try {
-      // If it's a new title, create it first
-      if (editTitle !== log.title && !titles.find(t => t.name === editTitle)) {
-        await createTitle(editTitle);
-      }
-      
-      const newDuration = Math.floor((newEnd.getTime() - newStart.getTime()) / 1000);
-      
-      await onUpdate(log.id, {
-        title: editTitle,
-        comment: editComment || undefined,
-        start_time: newStart.toISOString(),
-        duration: newDuration,
-      });
-      setIsOpen(false);
-    } catch (error) {
-      console.error('Error updating log:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleAddNewTitle = async () => {
-    if (!newTitle.trim()) return;
-    await createTitle(newTitle.trim());
-    setEditTitle(newTitle.trim());
-    setNewTitle('');
-  };
 
   const handleTrashClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -143,7 +66,7 @@ export function LogItem({ log, onUpdate, onDelete }: LogItemProps) {
   return (
     <>
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={() => onEdit(log)}
         className="w-full rounded-xl bg-secondary/50 p-4 text-left transition-colors active:bg-secondary"
       >
         <div className="flex items-start justify-between gap-3">
@@ -173,112 +96,6 @@ export function LogItem({ log, onUpdate, onDelete }: LogItemProps) {
           </div>
         </div>
       </button>
-
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-sm bg-card">
-          <DialogHeader>
-            <DialogTitle>Edit Activity</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Title</label>
-              <Select value={editTitle} onValueChange={setEditTitle}>
-                <SelectTrigger className="h-12">
-                  <SelectValue placeholder="Select a title" />
-                </SelectTrigger>
-                <SelectContent>
-                  {titles.map((title) => (
-                    <SelectItem key={title.id} value={title.name}>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="h-3 w-3 rounded-full"
-                          style={{ backgroundColor: title.color }}
-                        />
-                        {title.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Or add new title..."
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="h-10"
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleAddNewTitle}
-                  disabled={!newTitle.trim()}
-                  className="h-10 px-3"
-                >
-                  Add
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Time</label>
-              <div className="flex items-center gap-3">
-                <Input
-                  type="time"
-                  value={editStartTime}
-                  onChange={(e) => {
-                    setEditStartTime(e.target.value);
-                    setTimeError(null);
-                  }}
-                  className="flex-1"
-                />
-                <span className="text-sm text-muted-foreground">to</span>
-                <Input
-                  type="time"
-                  value={editEndTime}
-                  onChange={(e) => {
-                    setEditEndTime(e.target.value);
-                    setTimeError(null);
-                  }}
-                  className="flex-1"
-                />
-              </div>
-              {timeError && (
-                <p className="text-sm text-destructive">{timeError}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Comment</label>
-              <Textarea
-                placeholder="Add a comment..."
-                value={editComment}
-                onChange={(e) => setEditComment(e.target.value)}
-                className="min-h-[100px] resize-none"
-              />
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setIsOpen(false)}
-                className="flex-1 h-12"
-              >
-                <X className="mr-2 h-4 w-4" />
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="flex-1 h-12"
-              >
-                <Check className="mr-2 h-4 w-4" />
-                Save
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
