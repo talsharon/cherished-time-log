@@ -7,8 +7,11 @@ import { useTitles } from '@/hooks/useTitles';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Check, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Check, Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+
+const CREATE_NEW_VALUE = '__create_new__';
 
 export function ClockTab() {
   const { startTime, loading: sessionLoading, resetSession } = useActiveSession();
@@ -18,12 +21,22 @@ export function ClockTab() {
   const [selectedTitle, setSelectedTitle] = useState('Idle');
   const [comment, setComment] = useState('');
   const [newTitle, setNewTitle] = useState('');
+  const [isNewTitleDialogOpen, setIsNewTitleDialogOpen] = useState(false);
 
-  const handleAddNewTitle = async () => {
+  const handleTitleChange = (value: string) => {
+    if (value === CREATE_NEW_VALUE) {
+      setIsNewTitleDialogOpen(true);
+    } else {
+      setSelectedTitle(value);
+    }
+  };
+
+  const handleCreateNewTitle = async () => {
     if (!newTitle.trim()) return;
     await createTitle(newTitle.trim());
     setSelectedTitle(newTitle.trim());
     setNewTitle('');
+    setIsNewTitleDialogOpen(false);
   };
 
   const handleDone = async () => {
@@ -67,11 +80,17 @@ export function ClockTab() {
       <div className="w-full space-y-4 mb-8">
         <div className="space-y-2">
           <Label className="text-base font-medium text-muted-foreground">What are you up to?</Label>
-          <Select value={selectedTitle} onValueChange={setSelectedTitle}>
+          <Select value={selectedTitle} onValueChange={handleTitleChange}>
             <SelectTrigger className="h-12 bg-secondary/50">
               <SelectValue placeholder="Select activity" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
+              <SelectItem value={CREATE_NEW_VALUE}>
+                <div className="flex items-center gap-2">
+                  <Plus className="h-3 w-3" />
+                  Create new...
+                </div>
+              </SelectItem>
               <SelectItem value="Idle">
                 <div className="flex items-center gap-2">
                   <span
@@ -94,24 +113,6 @@ export function ClockTab() {
               ))}
             </SelectContent>
           </Select>
-          
-          <div className="flex gap-2">
-            <Input
-              placeholder="Or add new title..."
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              className="h-10 flex-1 bg-secondary/50"
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleAddNewTitle}
-              disabled={!newTitle.trim()}
-              className="h-10 px-3"
-            >
-              Add
-            </Button>
-          </div>
         </div>
 
         <Input
@@ -121,6 +122,34 @@ export function ClockTab() {
           className="h-12 bg-secondary/50"
         />
       </div>
+
+      <Dialog open={isNewTitleDialogOpen} onOpenChange={setIsNewTitleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Title</DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            placeholder="Enter title name..."
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && newTitle.trim()) {
+                handleCreateNewTitle();
+              }
+            }}
+            className="h-12"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsNewTitleDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateNewTitle} disabled={!newTitle.trim()}>
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="w-full">
         <Button
