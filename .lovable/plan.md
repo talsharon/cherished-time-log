@@ -1,74 +1,94 @@
 
 
-## Fix Header and Bottom Tab Bar to Stay Visible During Scroll
+## Fix Vertical Spacing Issue Between Header and Content
 
-### Overview
-Make the header and bottom navigation bar always visible while scrolling the logs list. Currently, on longer lists the entire page can scroll, pushing the navigation bars out of view.
+### Problem Identified
+
+The issue stems from two factors:
+
+1. **Default `mt-2` on TabsContent**: The Radix Tabs component has a default `margin-top: 0.5rem` that adds unwanted spacing
+2. **Inactive tab taking space**: Both TabsContent elements are in the DOM with `flex-1`, and the inactive one may be affecting layout
+
+### Current Structure
+```
+Header (fixed height)
+├─ Tabs (flex flex-1 flex-col)
+│   ├─ TabsContent[clock] (m-0 flex flex-1 flex-col)     ← hidden when on logs
+│   ├─ TabsContent[logs] (m-0 flex flex-1 flex-col)      ← active
+│   └─ TabsList (bottom bar)
+```
+
+Even though `m-0` is set, inactive TabsContent with `flex-1` can still compete for space.
 
 ---
 
 ### Solution
 
-The fix involves changing the layout from `min-h-screen` (grows with content) to `h-screen` (fixed viewport height), ensuring the middle content area is the only scrollable region.
-
----
+Force inactive tabs to not participate in flex layout by adding `data-[state=inactive]:hidden`:
 
 ### File: `src/pages/Index.tsx`
 
-**Change the main container height constraint:**
-
-| Before | After |
-|--------|-------|
-| `min-h-screen` | `h-screen` |
-
-This single change constrains the entire layout to the viewport height. Combined with the existing flexbox structure (`flex flex-col` + `flex-1` on tabs), the middle content becomes the only scrollable area.
+**Update both TabsContent elements:**
 
 ```tsx
-// Line 27: Change this
-<div className="flex min-h-screen flex-col bg-background safe-area-inset-top safe-area-inset-bottom">
+// Line 43-44: Add data-[state=inactive]:hidden
+<TabsContent value="clock" className="m-0 flex flex-1 flex-col data-[state=inactive]:hidden">
+  <ClockTab />
+</TabsContent>
 
-// To this
-<div className="flex h-screen flex-col bg-background safe-area-inset-top safe-area-inset-bottom">
+// Line 46-47: Add data-[state=inactive]:hidden  
+<TabsContent value="logs" className="m-0 flex flex-1 flex-col overflow-hidden data-[state=inactive]:hidden">
+  <LogsTab />
+</TabsContent>
 ```
 
 ---
 
 ### Why This Works
 
-The current layout structure is already correct:
+Radix UI Tabs use a `data-state` attribute to indicate `active` or `inactive` state:
+- `data-[state=inactive]:hidden` applies `display: none` when the tab is not selected
+- This removes the inactive tab from the flex layout entirely
+- Only the active tab participates in the `flex-1` space distribution
 
-```text
-┌─────────────────────────────────────┐
-│  Header (fixed height)              │  <- border-b, px-4 py-3
-├─────────────────────────────────────┤
-│                                     │
-│  Tabs Content (flex-1 + overflow)   │  <- Takes remaining space
-│  └─ LogsTab (overflow-auto)         │  <- Scrolls internally
-│                                     │
-├─────────────────────────────────────┤
-│  TabsList (fixed height)            │  <- border-t, py-3
-└─────────────────────────────────────┘
+---
+
+### Visual Before/After
+
+**Before:**
+```
+┌─────────────────────────────┐
+│  Header                     │
+├─────────────────────────────┤
+│  (invisible clock tab)      │  ← Taking flex-1 space!
+├─────────────────────────────┤
+│  Logs content               │  ← Also flex-1
+│                             │
+│                             │
+├─────────────────────────────┤
+│  Bottom Tab Bar             │  ← Pushed out of view
+└─────────────────────────────┘
 ```
 
-With `min-h-screen`: Container can grow beyond viewport, pushing bottom bar down
-With `h-screen`: Container is exactly viewport height, content scrolls within
+**After:**
+```
+┌─────────────────────────────┐
+│  Header                     │
+├─────────────────────────────┤
+│  Logs content               │  ← Only active tab in layout
+│                             │
+│                             │
+│                             │
+├─────────────────────────────┤
+│  Bottom Tab Bar             │  ← Visible in viewport
+└─────────────────────────────┘
+```
 
 ---
 
-### Existing Classes That Make This Work
+### Summary of Changes
 
-- **Header**: No `flex-1`, so it stays at its natural height
-- **Tabs container**: `flex flex-1 flex-col` - takes remaining space
-- **TabsContent for logs**: `flex flex-1 flex-col overflow-hidden` - constrains content
-- **LogsTab wrapper**: `flex-1 overflow-auto` - enables scrolling
-- **TabsList**: No `flex-1`, so it stays at its natural height at the bottom
-
----
-
-### Technical Notes
-
-- `h-screen` is equivalent to `height: 100vh`
-- On mobile, this works with the safe area insets already in place
-- The `overflow-hidden` on TabsContent prevents content from breaking out
-- The `overflow-auto` on LogsTab enables the scrollbar only when needed
+| File | Change |
+|------|--------|
+| `src/pages/Index.tsx` | Add `data-[state=inactive]:hidden` to both TabsContent elements |
 
