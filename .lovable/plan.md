@@ -1,94 +1,100 @@
 
 
-## Fix Vertical Spacing Issue Between Header and Content
+## Fix Fixed Layout with Proper Overflow Control
 
 ### Problem Identified
 
-The issue stems from two factors:
+The layout issue is caused by conflicting overflow behaviors:
 
-1. **Default `mt-2` on TabsContent**: The Radix Tabs component has a default `margin-top: 0.5rem` that adds unwanted spacing
-2. **Inactive tab taking space**: Both TabsContent elements are in the DOM with `flex-1`, and the inactive one may be affecting layout
+1. **Global CSS** in `src/index.css` sets `body { overflow: auto }` - this allows the entire page to scroll
+2. The `h-screen` container works correctly, but the body's scrollability overrides the intended behavior
+3. When any inner content grows, the body scrolls instead of the designated scrollable area
 
-### Current Structure
+### Root Cause
+
+```css
+/* Current in index.css */
+body {
+  height: 100%;
+  overflow: auto;  /* ← This allows page-level scrolling! */
+}
 ```
-Header (fixed height)
-├─ Tabs (flex flex-1 flex-col)
-│   ├─ TabsContent[clock] (m-0 flex flex-1 flex-col)     ← hidden when on logs
-│   ├─ TabsContent[logs] (m-0 flex flex-1 flex-col)      ← active
-│   └─ TabsList (bottom bar)
-```
 
-Even though `m-0` is set, inactive TabsContent with `flex-1` can still compete for space.
+Combined with the flex layout, this creates a situation where both the body AND the content area can scroll.
 
 ---
 
 ### Solution
 
-Force inactive tabs to not participate in flex layout by adding `data-[state=inactive]:hidden`:
+Two changes are needed:
+
+1. **Disable body scrolling** - The app shell should never scroll; only specific content areas should
+2. **Ensure root container fills viewport** - Use fixed positioning or proper height constraints
+
+---
+
+### File: `src/index.css`
+
+**Change body overflow from `auto` to `hidden`:**
+
+```css
+/* Line 68-72: Change overflow to hidden */
+body {
+  height: 100%;
+  overflow: hidden;  /* Changed from 'auto' */
+  -webkit-overflow-scrolling: touch;
+}
+```
+
+This prevents the body from scrolling while still allowing inner elements with `overflow-auto` to scroll.
+
+---
 
 ### File: `src/pages/Index.tsx`
 
-**Update both TabsContent elements:**
+**Add `overflow-hidden` to the main container to reinforce the constraint:**
 
 ```tsx
-// Line 43-44: Add data-[state=inactive]:hidden
-<TabsContent value="clock" className="m-0 flex flex-1 flex-col data-[state=inactive]:hidden">
-  <ClockTab />
-</TabsContent>
+// Line 27: Add overflow-hidden
+<div className="flex h-screen flex-col overflow-hidden bg-background safe-area-inset-top safe-area-inset-bottom">
+```
 
-// Line 46-47: Add data-[state=inactive]:hidden  
-<TabsContent value="logs" className="m-0 flex flex-1 flex-col overflow-hidden data-[state=inactive]:hidden">
-  <LogsTab />
-</TabsContent>
+This ensures no content can break out of the fixed viewport container.
+
+---
+
+### Visual Layout (After Fix)
+
+```
+┌─────────────────────────────────────┐
+│  Header (flex-shrink-0)             │  ← Never scrolls, fixed height
+├─────────────────────────────────────┤
+│                                     │
+│  Content Area (flex-1)              │  ← Takes remaining space
+│    ClockTab: centered, no scroll    │
+│    LogsTab: overflow-auto           │  ← Only this scrolls when needed
+│                                     │
+├─────────────────────────────────────┤
+│  TabsList (flex-shrink-0)           │  ← Never scrolls, fixed height
+└─────────────────────────────────────┘
 ```
 
 ---
 
 ### Why This Works
 
-Radix UI Tabs use a `data-state` attribute to indicate `active` or `inactive` state:
-- `data-[state=inactive]:hidden` applies `display: none` when the tab is not selected
-- This removes the inactive tab from the flex layout entirely
-- Only the active tab participates in the `flex-1` space distribution
-
----
-
-### Visual Before/After
-
-**Before:**
-```
-┌─────────────────────────────┐
-│  Header                     │
-├─────────────────────────────┤
-│  (invisible clock tab)      │  ← Taking flex-1 space!
-├─────────────────────────────┤
-│  Logs content               │  ← Also flex-1
-│                             │
-│                             │
-├─────────────────────────────┤
-│  Bottom Tab Bar             │  ← Pushed out of view
-└─────────────────────────────┘
-```
-
-**After:**
-```
-┌─────────────────────────────┐
-│  Header                     │
-├─────────────────────────────┤
-│  Logs content               │  ← Only active tab in layout
-│                             │
-│                             │
-│                             │
-├─────────────────────────────┤
-│  Bottom Tab Bar             │  ← Visible in viewport
-└─────────────────────────────┘
-```
+- **`overflow: hidden` on body**: Prevents any page-level scrolling
+- **`overflow-hidden` on container**: Extra safety to contain all content
+- **`h-screen`**: Container is exactly viewport height
+- **`flex-1`** on content: Takes remaining space after header/footer
+- **`overflow-auto`** in LogsTab: Only the logs list scrolls when content exceeds available space
 
 ---
 
 ### Summary of Changes
 
-| File | Change |
-|------|--------|
-| `src/pages/Index.tsx` | Add `data-[state=inactive]:hidden` to both TabsContent elements |
+| File | Line(s) | Change |
+|------|---------|--------|
+| `src/index.css` | 70 | Change `overflow: auto` to `overflow: hidden` |
+| `src/pages/Index.tsx` | 27 | Add `overflow-hidden` to main container class |
 
