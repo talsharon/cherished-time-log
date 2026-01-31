@@ -1,69 +1,48 @@
 
+## Disable DONE Button While Editing Comment
 
-## Align Card Content to Top and Normalize Minimum Heights
+### Overview
 
-### Changes Required
+Add focus state tracking for the comment input field. When the input is focused (user is typing), the DONE button will be disabled to prevent accidental taps.
 
-#### 1. Vertical Alignment Fix
+### Technical Approach
 
-Change `justify-center` to `justify-start` in both components to align content to the top of the card.
-
-#### 2. Minimum Height Normalization
-
-Increase the base height from 80px to 96px to ensure logs with comments fit within the minimum height without expanding.
-
----
-
-### File: `src/components/LogItem.tsx`
-
-**Line 85: Change class to align content to top**
-```tsx
-// Change from:
-className="... flex flex-col justify-center"
-
-// To:
-className="... flex flex-col justify-start"
-```
-
-**Line 24: Increase base height**
-```typescript
-// Change from:
-const baseHeight = 80;
-
-// To:
-const baseHeight = 96;
-```
+1. Add a new state variable `isCommentFocused` to track when the comment input has focus
+2. Add `onFocus` and `onBlur` handlers to the comment Input component
+3. Include `isCommentFocused` in the disabled condition for the DONE button
 
 ---
 
-### File: `src/components/GapItem.tsx`
+### File: `src/components/ClockTab.tsx`
 
-**Line 48: Change class to align content to top**
-```tsx
-// Change from:
-className="... flex flex-col justify-center"
-
-// To:
-className="... flex flex-col justify-start"
+**Add new state variable (after line 62):**
+```typescript
+const [isCommentFocused, setIsCommentFocused] = useState(false);
 ```
 
-**Line 15: Increase base height**
-```typescript
-// Change from:
-const baseHeight = 80;
+**Update the comment Input (lines 175-180):**
+```tsx
+<Input
+  placeholder="Add a comment..."
+  value={currentComment}
+  onChange={(e) => updateComment(e.target.value)}
+  onFocus={() => setIsCommentFocused(true)}
+  onBlur={() => setIsCommentFocused(false)}
+  className="h-12"
+/>
+```
 
-// To:
-const baseHeight = 96;
+**Update the DONE button disabled condition (line 214):**
+```tsx
+disabled={isSaving || !startTime || isCommentFocused}
 ```
 
 ---
 
 ### Summary
 
-| File | Line | Change |
-|------|------|--------|
-| `src/components/LogItem.tsx` | 24 | Change `baseHeight` from 80 to 96 |
-| `src/components/LogItem.tsx` | 85 | Change `justify-center` to `justify-start` |
-| `src/components/GapItem.tsx` | 15 | Change `baseHeight` from 80 to 96 |
-| `src/components/GapItem.tsx` | 48 | Change `justify-center` to `justify-start` |
-
+| Change | Location |
+|--------|----------|
+| Add `isCommentFocused` state | Line 62 |
+| Add `onFocus`/`onBlur` handlers to Input | Lines 175-180 |
+| Add `isCommentFocused` to disabled condition | Line 214 |
