@@ -1,45 +1,83 @@
 
-## Add New Title Input to Clock Page
+
+## Replace Inline Title Input with Modal Dialog
 
 ### Overview
-Add a free text input field below the title dropdown on the Clock page, allowing users to create new titles directly while setting up their activity (matching the pattern used in the log edit dialog).
+Change the Clock page so that creating a new title is done via a modal dialog instead of the inline input field. The dropdown will have "Create new..." as the first option, which opens a dialog with a text input field.
 
 ---
 
-### UI Changes
+### Current State
+- Dropdown with "Idle" and other titles
+- Separate input field + "Add" button below dropdown for creating new titles
 
-**Add below the title dropdown:**
-- Text input field with placeholder "Or add new title..."
-- "Add" button next to it
-- Same styling pattern as LogItem.tsx
+### New Design
+- Dropdown with "Create new..." as the first option (with a + icon)
+- Clicking "Create new..." opens a modal dialog
+- Dialog contains a text input field and Create/Cancel buttons
+- After creating, the new title is automatically selected
 
 ---
 
-### Implementation Details
+### Changes to `src/components/ClockTab.tsx`
 
-**File: `src/components/ClockTab.tsx`**
+1. **Add dialog state:**
+   - `isNewTitleDialogOpen` - controls modal visibility
 
-1. **Add new state variable:**
-   - `newTitle` - for the new title input text
+2. **Update Select onValueChange handler:**
+   - Detect when "\_\_create\_new\_\_" is selected
+   - Open the dialog instead of setting as selected title
+   - Keep previous selection until new title is created
 
-2. **Import `createTitle` from useTitles hook:**
-   - Already using `useTitles`, just need to destructure `createTitle`
+3. **Add "Create new..." option in dropdown:**
+   - First item in SelectContent
+   - Special value like "\_\_create\_new\_\_" to distinguish from real titles
+   - Include a Plus icon for visual clarity
 
-3. **Add `handleAddNewTitle` function:**
-   - Create the new title using `createTitle()`
-   - Set `selectedTitle` to the new title name
-   - Clear the `newTitle` input
+4. **Add Dialog component:**
+   - Import Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter from existing UI components
+   - Text input for new title name
+   - "Cancel" and "Create" buttons
+   - On create: call createTitle, set as selectedTitle, close dialog
 
-4. **Add UI elements after the Select dropdown:**
-   - Flex container with Input and Button
-   - Input: placeholder "Or add new title...", same height as other inputs
-   - Button: "Add" text, disabled when input is empty
+5. **Remove inline input field:**
+   - Delete the flex container with Input and "Add" button (lines 98-114)
+
+---
+
+### UI Flow
+
+```text
+User taps dropdown
+    |
+    v
++------------------------+
+| + Create new...        |  <-- First option
+| (dot) Idle             |
+| (dot) Work             |
+| (dot) Exercise         |
++------------------------+
+    |
+    v (if "Create new..." selected)
++------------------------+
+|   Create New Title     |
+|                        |
+|  [Enter title name]    |
+|                        |
+|  [Cancel]   [Create]   |
++------------------------+
+    |
+    v (on Create)
+New title selected in dropdown
+```
 
 ---
 
 ### Technical Notes
 
-- Follows the exact same pattern as LogItem.tsx for consistency
-- New title gets a random color automatically (handled by useTitles hook)
-- After adding, the new title becomes the selected title
-- The new title will immediately appear in the dropdown for future use
+- Uses existing Dialog component from `@/components/ui/dialog`
+- Special value "\_\_create\_new\_\_" ensures it doesn't conflict with real title names
+- Plus icon from lucide-react for visual affordance
+- Dialog input auto-focuses when opened
+- Create button disabled when input is empty
+
