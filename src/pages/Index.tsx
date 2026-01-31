@@ -40,10 +40,10 @@ export default function Index() {
 
         {/* Main Content with Tabs */}
         <Tabs defaultValue="clock" className="flex flex-1 flex-col">
-          <TabsContent value="clock" className="m-0 flex flex-1 flex-col">
+          <TabsContent value="clock" className="m-0 flex flex-1 flex-col data-[state=inactive]:hidden">
             <ClockTab />
           </TabsContent>
-          <TabsContent value="logs" className="m-0 flex flex-1 flex-col overflow-hidden">
+          <TabsContent value="logs" className="m-0 flex flex-1 flex-col overflow-hidden data-[state=inactive]:hidden">
             <LogsTab />
           </TabsContent>
 
