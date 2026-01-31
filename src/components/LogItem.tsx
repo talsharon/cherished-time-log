@@ -36,6 +36,15 @@ function formatTimeRange(startTime: string, durationSeconds: number): string {
   const startStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const endStr = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   
+  // Check if event spans to next day(s)
+  const startDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const endDate = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  const daysDiff = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (daysDiff > 0) {
+    return `${startStr} - ${endStr} (+${daysDiff})`;
+  }
+  
   return `${startStr} - ${endStr}`;
 }
 
