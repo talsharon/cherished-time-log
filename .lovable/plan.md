@@ -1,39 +1,173 @@
 
 
-## Add Gap Detection with "What were you up to?" Cards
+## Handle Multi-Day Events and Empty Days
 
 ### Overview
-Detect time gaps between consecutive logs within each day and display placeholder cards asking "What were you up to?" that allow users to quickly fill in missing time periods. These gap cards look similar to regular log cards but without a delete button.
+Address scenarios where activities span multiple days and handle days with no logged activities by showing appropriate gap cards.
 
 ---
 
 ### Changes Summary
 
-1. **GapItem.tsx**: New component for rendering gap placeholder cards
-2. **LogsTab.tsx**: Add gap detection logic and integrate gap cards
-3. **LogDialog.tsx**: Extend to accept pre-populated start/end times for gap mode
+1. **LogItem.tsx**: Update `formatTimeRange` to show "+N" for multi-day events
+2. **GapItem.tsx**: Update `formatTimeRange` to show "+N" if gap spans midnight
+3. **LogsTab.tsx**: 
+   - Modify `getLogsWithGaps` to handle overnight logs from previous day
+   - Add logic to detect and display empty days with full-day gap cards
 
 ---
 
-### Gap Detection Logic
+### File: `src/components/LogItem.tsx`
 
-A gap exists when the end time of one log doesn't match the start time of the next log within the same day.
+**Update `formatTimeRange` function to show day offset:**
 
 ```typescript
-interface Gap {
-  startTime: Date;  // End of previous log
-  endTime: Date;    // Start of next log
-  duration: number; // In seconds
+function formatTimeRange(startTime: string, durationSeconds: number): string {
+  const start = new Date(startTime);
+  const end = new Date(start.getTime() + durationSeconds * 1000);
+  
+  const startStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const endStr = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  // Check if event spans to next day(s)
+  const startDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const endDate = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  const daysDiff = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (daysDiff > 0) {
+    return `${startStr} - ${endStr} (+${daysDiff})`;
+  }
+  
+  return `${startStr} - ${endStr}`;
+}
+```
+
+---
+
+### File: `src/components/GapItem.tsx`
+
+**Update `formatTimeRange` to handle cross-midnight gaps:**
+
+```typescript
+function formatTimeRange(startTime: Date, endTime: Date): string {
+  const startStr = startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const endStr = endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  // Check if gap spans to next day(s)
+  const startDate = new Date(startTime.getFullYear(), startTime.getMonth(), startTime.getDate());
+  const endDate = new Date(endTime.getFullYear(), endTime.getMonth(), endTime.getDate());
+  const daysDiff = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (daysDiff > 0) {
+    return `${startStr} - ${endStr} (+${daysDiff})`;
+  }
+  
+  return `${startStr} - ${endStr}`;
+}
+```
+
+---
+
+### File: `src/components/LogsTab.tsx`
+
+#### 1. New Function: Generate All Days Including Empty Ones
+
+```typescript
+interface DaySection {
+  dateKey: string;
+  dateLabel: string;
+  logs: Log[];
+  isEmptyDay: boolean;
 }
 
-function detectGaps(dayLogs: Log[], minGapMinutes: number = 1): (Log | Gap)[] {
+function generateDaySections(logs: Log[]): DaySection[] {
+  if (logs.length === 0) return [];
+  
+  const sections: DaySection[] = [];
+  const logsByDate = groupLogsByDate(logs);
+  
+  // Find the date range (earliest log to today)
+  const sortedDates = Array.from(logsByDate.keys()).sort();
+  const earliestDateKey = sortedDates[0];
+  const [ey, em, ed] = earliestDateKey.split('-').map(Number);
+  const earliestDate = new Date(ey, em, ed);
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Iterate from today backwards to earliest date
+  const current = new Date(today);
+  
+  while (current >= earliestDate) {
+    const dateKey = getDateKey(current.toISOString());
+    const dayLogs = logsByDate.get(dateKey) || [];
+    
+    sections.push({
+      dateKey,
+      dateLabel: getSectionTitle(current.toISOString()),
+      logs: dayLogs,
+      isEmptyDay: dayLogs.length === 0,
+    });
+    
+    current.setDate(current.getDate() - 1);
+  }
+  
+  return sections;
+}
+```
+
+#### 2. Updated Gap Detection with Overnight Log Handling
+
+```typescript
+function getLogsWithGaps(
+  dayLogs: Log[], 
+  allLogs: Log[], 
+  dateKey: string, 
+  minGapMinutes: number = 1
+): (Log | Gap)[] {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const dayStart = new Date(year, month, day, 0, 0, 0, 0);
+  const dayEnd = new Date(year, month, day, 23, 59, 59, 999);
+  
+  // Find overnight log from previous day extending into this day
+  const overnightLog = allLogs.find(log => {
+    const logStart = new Date(log.start_time);
+    const logEnd = new Date(logStart.getTime() + log.duration * 1000);
+    const logDateKey = getDateKey(log.start_time);
+    
+    return logDateKey !== dateKey && 
+           logStart < dayStart && 
+           logEnd > dayStart;
+  });
+  
+  // Effective day start (after overnight log ends, if any)
+  let effectiveDayStart = dayStart;
+  if (overnightLog) {
+    const overnightEnd = new Date(
+      new Date(overnightLog.start_time).getTime() + overnightLog.duration * 1000
+    );
+    if (overnightEnd > dayStart) {
+      effectiveDayStart = overnightEnd;
+    }
+  }
+  
+  // If no logs for this day, return single full-day gap
+  if (dayLogs.length === 0) {
+    return [{
+      startTime: effectiveDayStart,
+      endTime: dayEnd,
+      duration: Math.floor((dayEnd.getTime() - effectiveDayStart.getTime()) / 1000),
+    }];
+  }
+  
   const items: (Log | Gap)[] = [];
   
-  // Sort by start_time descending (most recent first, matching current order)
+  // Sort by start_time descending (most recent first)
   const sorted = [...dayLogs].sort((a, b) => 
     new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
   );
   
+  // Process gaps between consecutive logs
   for (let i = 0; i < sorted.length; i++) {
     const current = sorted[i];
     items.push(current);
@@ -56,245 +190,137 @@ function detectGaps(dayLogs: Log[], minGapMinutes: number = 1): (Log | Gap)[] {
     }
   }
   
+  // Check for gap at the start of day (before first log)
+  const earliestLog = sorted[sorted.length - 1];
+  const earliestLogStart = new Date(earliestLog.start_time);
+  
+  const startGapMs = earliestLogStart.getTime() - effectiveDayStart.getTime();
+  const startGapMinutes = startGapMs / (1000 * 60);
+  
+  if (startGapMinutes >= minGapMinutes) {
+    items.push({
+      startTime: effectiveDayStart,
+      endTime: earliestLogStart,
+      duration: Math.floor(startGapMs / 1000),
+    });
+  }
+  
   return items;
 }
 ```
 
----
-
-### File: `src/components/GapItem.tsx` (New File)
-
-A simplified card component for gap placeholders:
-
-```typescript
-interface GapItemProps {
-  gap: {
-    startTime: Date;
-    endTime: Date;
-    duration: number;
-  };
-  onClick: () => void;
-}
-```
-
-**Visual Design:**
-- Same card styling as LogItem (rounded-xl, bg-secondary/50, p-4)
-- No colored dot (or use a dashed/muted style)
-- Title text: "What were you up to?" in muted/italic style
-- Time range displayed same as regular logs
-- Duration shown same as regular logs
-- No delete button
-- Slightly different visual treatment (e.g., dashed border or muted background)
+#### 3. Updated Rendering Logic
 
 ```tsx
-export function GapItem({ gap, onClick }: GapItemProps) {
+export function LogsTab() {
+  const { logs, loading, updateLog, deleteLog, createLog } = useLogs();
+  // ... existing state
+  
+  const daySections = useMemo(() => generateDaySections(logs), [logs]);
+  
+  // ... existing handlers
+  
   return (
-    <button
-      onClick={onClick}
-      className="w-full rounded-xl border border-dashed border-muted-foreground/30 bg-secondary/30 p-4 text-left transition-colors active:bg-secondary/50"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="inline-block h-3 w-3 rounded-full border border-dashed border-muted-foreground/50 flex-shrink-0" />
-            <span className="font-medium text-muted-foreground italic">
-              What were you up to?
-            </span>
+    <div className="flex-1 overflow-auto px-4 py-4">
+      <div className="space-y-6">
+        {daySections.map((section) => (
+          <div key={section.dateKey}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-muted-foreground">
+                {section.dateLabel}
+              </h3>
+              <button
+                onClick={() => handleAddClick(new Date(/* parse dateKey */))}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {getLogsWithGaps(section.logs, logs, section.dateKey).map((item) => (
+                isGap(item) ? (
+                  <GapItem
+                    key={`gap-${item.startTime.getTime()}`}
+                    gap={item}
+                    onClick={() => handleGapClick(item)}
+                  />
+                ) : (
+                  <LogItem
+                    key={item.id}
+                    log={item}
+                    onEdit={handleEditClick}
+                    onDelete={deleteLog}
+                  />
+                )
+              ))}
+            </div>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {formatTimeRange(gap.startTime, gap.endTime)}
-          </p>
-        </div>
-        <span className="font-mono text-lg font-medium text-muted-foreground">
-          {formatDuration(gap.duration)}
-        </span>
+        ))}
       </div>
-    </button>
+      
+      <LogDialog ... />
+    </div>
   );
 }
 ```
 
 ---
 
-### File: `src/components/LogDialog.tsx`
+### Visual Examples
 
-**Extend to accept pre-populated times:**
-
-Add optional `initialStartTime` and `initialEndTime` props:
-
-```typescript
-interface LogDialogProps {
-  mode: 'edit' | 'add';
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  log?: Log;
-  onUpdate?: (...) => Promise<void>;
-  date?: Date;
-  onCreate?: (...) => Promise<void>;
-  // New: for gap mode
-  initialStartTime?: string;  // HH:MM format
-  initialEndTime?: string;    // HH:MM format
-}
+**Empty Day:**
+```
+┌─────────────────────────────────────┐
+│  Wednesday                      [+] │
+├─────────────────────────────────────┤
+│  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐ │
+│  │ ○  What were you up to?    24h│ │
+│  │    00:00 - 23:59               │ │
+│  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘ │
+└─────────────────────────────────────┘
 ```
 
-**Update initialization logic:**
+**Overnight Log Display:**
+```
+┌─────────────────────────────────────┐
+│  Yesterday                      [+] │
+├─────────────────────────────────────┤
+│  ┌───────────────────────────────┐  │
+│  │ ● Gaming           4h         │  │
+│  │   23:00 - 03:00 (+1)          │  │
+│  └───────────────────────────────┘  │
+└─────────────────────────────────────┘
 
-```typescript
-useEffect(() => {
-  if (!isOpen) return;
-  
-  if (mode === 'edit' && log) {
-    // ... existing edit mode logic
-  } else if (mode === 'add' && date) {
-    setTitle('Idle');
-    setComment('');
-    
-    // Use provided times if available, otherwise use defaults
-    if (initialStartTime && initialEndTime) {
-      setStartTime(initialStartTime);
-      setEndTime(initialEndTime);
-    } else {
-      const defaultStart = getDefaultStartTime(date);
-      setStartTime(defaultStart);
-      setEndTime(getDefaultEndTime(defaultStart));
-    }
-  }
-  
-  setTimeError(null);
-  setNewTitle('');
-}, [isOpen, mode, log, date, initialStartTime, initialEndTime]);
+┌─────────────────────────────────────┐
+│  Today                          [+] │
+├─────────────────────────────────────┤
+│  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐ │
+│  │ ○  What were you up to?    6h │ │
+│  │    03:00 - 09:00               │ │
+│  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘ │
+│  ┌───────────────────────────────┐  │
+│  │ ● Work             8h         │  │
+│  │   09:00 - 17:00               │  │
+│  └───────────────────────────────┘  │
+└─────────────────────────────────────┘
 ```
 
 ---
 
-### File: `src/components/LogsTab.tsx`
+### Edge Cases Handled
 
-**1. Import new component:**
-```typescript
-import { GapItem } from '@/components/GapItem';
-```
-
-**2. Add type guard and gap detection:**
-```typescript
-interface Gap {
-  startTime: Date;
-  endTime: Date;
-  duration: number;
-}
-
-function isGap(item: Log | Gap): item is Gap {
-  return 'startTime' in item && item.startTime instanceof Date;
-}
-
-function getLogsWithGaps(dayLogs: Log[], minGapMinutes: number = 1): (Log | Gap)[] {
-  // Implementation as described above
-}
-```
-
-**3. Add state for gap times:**
-```typescript
-const [gapStartTime, setGapStartTime] = useState<string | undefined>(undefined);
-const [gapEndTime, setGapEndTime] = useState<string | undefined>(undefined);
-```
-
-**4. Add handler for gap click:**
-```typescript
-const handleGapClick = (gap: Gap) => {
-  setSelectedDate(gap.startTime);
-  setGapStartTime(formatTimeForInput(gap.startTime));
-  setGapEndTime(formatTimeForInput(gap.endTime));
-  setDialogMode('add');
-};
-```
-
-**5. Update close handler to clear gap times:**
-```typescript
-const handleCloseDialog = () => {
-  setDialogMode(null);
-  setSelectedLog(null);
-  setSelectedDate(null);
-  setGapStartTime(undefined);
-  setGapEndTime(undefined);
-};
-```
-
-**6. Update rendering logic:**
-```tsx
-<div className="space-y-3">
-  {getLogsWithGaps(dayLogs).map((item, index) => (
-    isGap(item) ? (
-      <GapItem
-        key={`gap-${item.startTime.getTime()}`}
-        gap={item}
-        onClick={() => handleGapClick(item)}
-      />
-    ) : (
-      <LogItem
-        key={item.id}
-        log={item}
-        onEdit={handleEditClick}
-        onDelete={deleteLog}
-      />
-    )
-  ))}
-</div>
-```
-
-**7. Pass gap times to dialog:**
-```tsx
-<LogDialog
-  mode={dialogMode === 'edit' ? 'edit' : 'add'}
-  isOpen={dialogMode !== null}
-  onOpenChange={(open) => !open && handleCloseDialog()}
-  log={selectedLog ?? undefined}
-  date={selectedDate ?? undefined}
-  onUpdate={updateLog}
-  onCreate={createLog}
-  initialStartTime={gapStartTime}
-  initialEndTime={gapEndTime}
-/>
-```
+1. **Multi-day events**: Show "+N" indicator on time display
+2. **Empty days**: Show full-day gap card (00:00 - 23:59)
+3. **Empty day after overnight log**: Gap starts from overnight log end time, not 00:00
+4. **No logs at all**: Show empty state (existing behavior unchanged)
+5. **Gaps between consecutive logs**: Existing logic preserved
 
 ---
 
-### Visual Comparison
+### Technical Notes
 
-| Aspect | Regular LogItem | GapItem |
-|--------|-----------------|---------|
-| Background | bg-secondary/50 | bg-secondary/30 |
-| Border | none | border-dashed border-muted-foreground/30 |
-| Color dot | Solid with title color | Dashed circle, no fill |
-| Title | Activity title | "What were you up to?" (italic) |
-| Comment | Optional | None |
-| Time range | Shown | Shown |
-| Duration | Shown | Shown |
-| Delete button | Yes | No |
-
----
-
-### Edge Cases
-
-1. **Minimum gap threshold**: Only show gaps >= 1 minute (configurable)
-2. **Overlapping logs**: If logs overlap, don't show a gap
-3. **Same-second boundaries**: Treat logs that end exactly when the next starts as continuous
-
----
-
-### Data Flow
-
-```text
-User views Logs page
-  -> groupLogsByDate(logs)
-  -> For each day: getLogsWithGaps(dayLogs)
-  -> Render mixed list of LogItem and GapItem
-  
-User clicks GapItem
-  -> handleGapClick(gap)
-  -> Sets date + initialStartTime + initialEndTime
-  -> Opens LogDialog in 'add' mode with times pre-filled
-  
-User saves
-  -> onCreate(startTime, duration, title, comment)
-  -> Gap disappears as new log fills the time slot
-```
+- Empty days are only shown between the earliest logged day and today
+- The `23:59:59.999` end time ensures we cover the full day without overlapping into the next
+- Performance: `generateDaySections` runs once per render, uses memoization
+- The overnight log lookup searches all logs but could be optimized with a date index if needed
 
