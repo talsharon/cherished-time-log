@@ -4,7 +4,7 @@ import { LogItem } from '@/components/LogItem';
 import { Loader2, Clock } from 'lucide-react';
 
 export function LogsTab() {
-  const { logs, loading, updateLog } = useLogs();
+  const { logs, loading, updateLog, deleteLog } = useLogs();
   const { loading: titlesLoading } = useTitles();
 
   if (loading || titlesLoading) {
@@ -31,7 +31,7 @@ export function LogsTab() {
     <div className="flex-1 overflow-auto px-4 py-4">
       <div className="space-y-3">
         {logs.map((log) => (
-          <LogItem key={log.id} log={log} onUpdate={updateLog} />
+          <LogItem key={log.id} log={log} onUpdate={updateLog} onDelete={deleteLog} />
         ))}
       </div>
     </div>

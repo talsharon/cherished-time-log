@@ -6,11 +6,22 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Check, X } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Check, X, Trash2, Loader2 } from 'lucide-react';
 
 interface LogItemProps {
   log: Log;
   onUpdate: (id: string, updates: { title?: string; comment?: string }) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }
 
 function formatDuration(seconds: number): string {
@@ -23,26 +34,36 @@ function formatDuration(seconds: number): string {
   return `${minutes}m`;
 }
 
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
+function formatTimeRange(startTime: string, durationSeconds: number): string {
+  const start = new Date(startTime);
+  const end = new Date(start.getTime() + durationSeconds * 1000);
   const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+  const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   
+  const startStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const endStr = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  let dayPrefix = '';
   if (diffDays === 0) {
-    return `Today, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    dayPrefix = 'Today, ';
   } else if (diffDays === 1) {
-    return `Yesterday, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    dayPrefix = 'Yesterday, ';
+  } else {
+    dayPrefix = start.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ';
   }
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  
+  return `${dayPrefix}${startStr} - ${endStr}`;
 }
 
-export function LogItem({ log, onUpdate }: LogItemProps) {
+export function LogItem({ log, onUpdate, onDelete }: LogItemProps) {
   const { titles, getColorForTitle, createTitle } = useTitles();
   const [isOpen, setIsOpen] = useState(false);
   const [editTitle, setEditTitle] = useState(log.title);
   const [editComment, setEditComment] = useState(log.comment || '');
   const [newTitle, setNewTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const titleColor = getColorForTitle(log.title);
 
@@ -73,6 +94,23 @@ export function LogItem({ log, onUpdate }: LogItemProps) {
     setNewTitle('');
   };
 
+  const handleTrashClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await onDelete(log.id);
+      setIsDeleteDialogOpen(false);
+    } catch (error) {
+      console.error('Error deleting log:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <>
       <button
@@ -91,12 +129,18 @@ export function LogItem({ log, onUpdate }: LogItemProps) {
             {log.comment && (
               <p className="mt-1 text-sm text-muted-foreground line-clamp-1">{log.comment}</p>
             )}
-            <p className="mt-2 text-xs text-muted-foreground">{formatDate(log.start_time)}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{formatTimeRange(log.start_time, log.duration)}</p>
           </div>
-          <div className="text-right flex-shrink-0">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <span className="font-mono text-lg font-medium text-foreground">
               {formatDuration(log.duration)}
             </span>
+            <button
+              onClick={handleTrashClick}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </button>
@@ -178,6 +222,27 @@ export function LogItem({ log, onUpdate }: LogItemProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Activity</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this activity? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
