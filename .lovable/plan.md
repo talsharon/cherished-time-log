@@ -1,83 +1,139 @@
 
 
-## Replace Inline Title Input with Modal Dialog
+## Last Logged Event Display with Animation
 
 ### Overview
-Change the Clock page so that creating a new title is done via a modal dialog instead of the inline input field. The dropdown will have "Create new..." as the first option, which opens a dialog with a text input field.
+Replace the "Tap to log activity" label with a display of the last logged event. When a new log is created, animate the transition: the previous log slides down and out while the new log slides in from the side.
 
 ---
 
-### Current State
-- Dropdown with "Idle" and other titles
-- Separate input field + "Add" button below dropdown for creating new titles
+### Changes Summary
 
-### New Design
-- Dropdown with "Create new..." as the first option (with a + icon)
-- Clicking "Create new..." opens a modal dialog
-- Dialog contains a text input field and Create/Cancel buttons
-- After creating, the new title is automatically selected
+1. Remove the "Tap to log activity" label
+2. Import logs from useLogs hook to access the latest entry
+3. Add animation keyframes to tailwind.config.ts
+4. Create an animated "last log" display component below the Done button
+5. Track animation state to trigger transitions when new logs are created
 
 ---
 
-### Changes to `src/components/ClockTab.tsx`
+### Implementation Details
 
-1. **Add dialog state:**
-   - `isNewTitleDialogOpen` - controls modal visibility
+**File: `tailwind.config.ts`**
 
-2. **Update Select onValueChange handler:**
-   - Detect when "\_\_create\_new\_\_" is selected
-   - Open the dialog instead of setting as selected title
-   - Keep previous selection until new title is created
-
-3. **Add "Create new..." option in dropdown:**
-   - First item in SelectContent
-   - Special value like "\_\_create\_new\_\_" to distinguish from real titles
-   - Include a Plus icon for visual clarity
-
-4. **Add Dialog component:**
-   - Import Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter from existing UI components
-   - Text input for new title name
-   - "Cancel" and "Create" buttons
-   - On create: call createTitle, set as selectedTitle, close dialog
-
-5. **Remove inline input field:**
-   - Delete the flex container with Input and "Add" button (lines 98-114)
-
----
-
-### UI Flow
+Add new keyframes and animations:
+- `slide-out-down`: Slides element down and fades out
+- `slide-in-right`: Slides element in from the right side
 
 ```text
-User taps dropdown
-    |
-    v
-+------------------------+
-| + Create new...        |  <-- First option
-| (dot) Idle             |
-| (dot) Work             |
-| (dot) Exercise         |
-+------------------------+
-    |
-    v (if "Create new..." selected)
-+------------------------+
-|   Create New Title     |
-|                        |
-|  [Enter title name]    |
-|                        |
-|  [Cancel]   [Create]   |
-+------------------------+
-    |
-    v (on Create)
-New title selected in dropdown
+keyframes: {
+  "slide-out-down": {
+    "0%": { transform: "translateY(0)", opacity: "1" },
+    "100%": { transform: "translateY(100%)", opacity: "0" }
+  },
+  "slide-in-right": {
+    "0%": { transform: "translateX(100%)", opacity: "0" },
+    "100%": { transform: "translateX(0)", opacity: "1" }
+  }
+}
+animation: {
+  "slide-out-down": "slide-out-down 0.3s ease-out forwards",
+  "slide-in-right": "slide-in-right 0.3s ease-out forwards"
+}
+```
+
+---
+
+**File: `src/components/ClockTab.tsx`**
+
+1. **Import changes:**
+   - Import `logs` from useLogs hook (already imported, just destructure)
+   - Import `useTitles` hook's `getColorForTitle` (already available)
+   - Add `useEffect` to React imports
+
+2. **Add state for animation:**
+   - `animatingLogId` - tracks which log is currently animating in
+   - `previousLogId` - tracks the log that should animate out
+
+3. **Track when new log is created:**
+   - After `createLog` succeeds, store the previous and new log IDs
+   - Set animation state to trigger transitions
+
+4. **Remove the label:**
+   - Delete: `<p className="mt-4 text-center text-sm text-muted-foreground">Tap to log activity</p>`
+
+5. **Add last log display (below button):**
+   - Container with `overflow-hidden` to clip animations
+   - Display the most recent log with:
+     - Color dot matching the title
+     - Title text
+     - Duration (formatted like LogItem)
+     - Comment if present (truncated)
+   - Apply animation classes based on state
+
+6. **Update handleDone:**
+   - Before creating log, store current lastLog id as `previousLogId`
+   - After creating log, set `animatingLogId` to trigger slide-in animation
+
+---
+
+### UI Layout (below Done button)
+
+```text
++------------------------------------------+
+|              [DONE BUTTON]               |
++------------------------------------------+
+|                                          |
+|  (animated container)                    |
+|  +--------------------------------------+|
+|  | (dot) Title        Duration          ||
+|  | Comment text (if any)                ||
+|  +--------------------------------------+|
+|                                          |
++------------------------------------------+
+```
+
+---
+
+### Animation Flow
+
+```text
+1. User taps DONE
+   |
+   v
+2. Previous log starts "slide-out-down" animation
+   |
+   v
+3. After delay, new log "slide-in-right" animation
+   |
+   v
+4. Animation completes, new log is static
+```
+
+---
+
+### Helper Function
+
+Add a `formatDuration` function (same as LogItem):
+```typescript
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
 ```
 
 ---
 
 ### Technical Notes
 
-- Uses existing Dialog component from `@/components/ui/dialog`
-- Special value "\_\_create\_new\_\_" ensures it doesn't conflict with real title names
-- Plus icon from lucide-react for visual affordance
-- Dialog input auto-focuses when opened
-- Create button disabled when input is empty
+- Uses existing `logs` array from useLogs hook - logs[0] is the most recent
+- Animation duration: 300ms for both out and in transitions
+- Uses `forwards` fill mode to keep final animation state
+- Container uses `overflow-hidden` to prevent visible overflow during animation
+- If no logs exist, the section remains empty (no placeholder needed)
+- Animation state resets after completion using useEffect with timeout
 
