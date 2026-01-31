@@ -222,30 +222,26 @@ export function LogItem({ log, onUpdate, onDelete }: LogItemProps) {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Time</label>
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <Input
-                    type="time"
-                    value={editStartTime}
-                    onChange={(e) => {
-                      setEditStartTime(e.target.value);
-                      setTimeError(null);
-                    }}
-                    className="h-12"
-                  />
-                </div>
-                <span className="text-muted-foreground">to</span>
-                <div className="flex-1">
-                  <Input
-                    type="time"
-                    value={editEndTime}
-                    onChange={(e) => {
-                      setEditEndTime(e.target.value);
-                      setTimeError(null);
-                    }}
-                    className="h-12"
-                  />
-                </div>
+              <div className="flex items-center gap-3">
+                <Input
+                  type="time"
+                  value={editStartTime}
+                  onChange={(e) => {
+                    setEditStartTime(e.target.value);
+                    setTimeError(null);
+                  }}
+                  className="flex-1"
+                />
+                <span className="text-sm text-muted-foreground">to</span>
+                <Input
+                  type="time"
+                  value={editEndTime}
+                  onChange={(e) => {
+                    setEditEndTime(e.target.value);
+                    setTimeError(null);
+                  }}
+                  className="flex-1"
+                />
               </div>
               {timeError && (
                 <p className="text-sm text-destructive">{timeError}</p>
