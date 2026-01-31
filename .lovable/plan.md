@@ -1,100 +1,115 @@
 
 
-## Fix Fixed Layout with Proper Overflow Control
+## Make Log Card Heights Proportional to Time Spent
 
-### Problem Identified
+### Overview
 
-The layout issue is caused by conflicting overflow behaviors:
+Cards in the logs list will have heights that visually represent time spent, making it easy to see at a glance which activities took longer.
 
-1. **Global CSS** in `src/index.css` sets `body { overflow: auto }` - this allows the entire page to scroll
-2. The `h-screen` container works correctly, but the body's scrollability overrides the intended behavior
-3. When any inner content grows, the body scrolls instead of the designated scrollable area
+### Height Calculation Rules
 
-### Root Cause
+| Duration | Rounded To | Height Multiplier |
+|----------|------------|-------------------|
+| 0-44 min | 30 min | 1x (minimum) |
+| 45-74 min | 1h | 2x |
+| 75-104 min | 1.5h | 3x |
+| 105-134 min | 2h | 4x |
+| 135-164 min | 2.5h | 5x |
+| 165+ min | 3h | 6x (maximum) |
 
-```css
-/* Current in index.css */
-body {
-  height: 100%;
-  overflow: auto;  /* ← This allows page-level scrolling! */
+### Technical Approach
+
+Create a utility function to calculate card height based on duration:
+
+```typescript
+function getCardMinHeight(durationSeconds: number): number {
+  const durationMinutes = durationSeconds / 60;
+  
+  // Round to nearest 30 minutes
+  const roundedHalfHours = Math.round(durationMinutes / 30);
+  
+  // Clamp between 1 (30 min) and 6 (3 hours)
+  const clampedHalfHours = Math.max(1, Math.min(6, roundedHalfHours));
+  
+  // Base height for 30 minutes = 80px (roughly current card size)
+  const baseHeight = 80;
+  
+  return baseHeight * clampedHalfHours;
 }
 ```
 
-Combined with the flex layout, this creates a situation where both the body AND the content area can scroll.
-
 ---
 
-### Solution
+### File Changes
 
-Two changes are needed:
+#### 1. `src/components/LogItem.tsx`
 
-1. **Disable body scrolling** - The app shell should never scroll; only specific content areas should
-2. **Ensure root container fills viewport** - Use fixed positioning or proper height constraints
-
----
-
-### File: `src/index.css`
-
-**Change body overflow from `auto` to `hidden`:**
-
-```css
-/* Line 68-72: Change overflow to hidden */
-body {
-  height: 100%;
-  overflow: hidden;  /* Changed from 'auto' */
-  -webkit-overflow-scrolling: touch;
+**Add height calculation function:**
+```typescript
+function getCardMinHeight(durationSeconds: number): number {
+  const durationMinutes = durationSeconds / 60;
+  const roundedHalfHours = Math.round(durationMinutes / 30);
+  const clampedHalfHours = Math.max(1, Math.min(6, roundedHalfHours));
+  const baseHeight = 80;
+  return baseHeight * clampedHalfHours;
 }
 ```
 
-This prevents the body from scrolling while still allowing inner elements with `overflow-auto` to scroll.
-
----
-
-### File: `src/pages/Index.tsx`
-
-**Add `overflow-hidden` to the main container to reinforce the constraint:**
-
+**Apply dynamic height to card button:**
 ```tsx
-// Line 27: Add overflow-hidden
-<div className="flex h-screen flex-col overflow-hidden bg-background safe-area-inset-top safe-area-inset-bottom">
+<button
+  onClick={() => onEdit(log)}
+  className="w-full rounded-xl bg-secondary/50 p-4 text-left transition-colors active:bg-secondary flex flex-col justify-center"
+  style={{ minHeight: getCardMinHeight(log.duration) }}
+>
 ```
 
-This ensures no content can break out of the fixed viewport container.
+#### 2. `src/components/GapItem.tsx`
+
+**Add the same height calculation function:**
+```typescript
+function getCardMinHeight(durationSeconds: number): number {
+  const durationMinutes = durationSeconds / 60;
+  const roundedHalfHours = Math.round(durationMinutes / 30);
+  const clampedHalfHours = Math.max(1, Math.min(6, roundedHalfHours));
+  const baseHeight = 80;
+  return baseHeight * clampedHalfHours;
+}
+```
+
+**Apply dynamic height to gap card:**
+```tsx
+<button
+  onClick={onClick}
+  className="w-full rounded-xl border border-dashed border-muted-foreground/30 bg-secondary/30 p-4 text-left transition-colors active:bg-secondary/50 flex flex-col justify-center"
+  style={{ minHeight: getCardMinHeight(gap.duration) }}
+>
+```
 
 ---
 
-### Visual Layout (After Fix)
+### Visual Result
 
 ```
 ┌─────────────────────────────────────┐
-│  Header (flex-shrink-0)             │  ← Never scrolls, fixed height
-├─────────────────────────────────────┤
-│                                     │
-│  Content Area (flex-1)              │  ← Takes remaining space
-│    ClockTab: centered, no scroll    │
-│    LogsTab: overflow-auto           │  ← Only this scrolls when needed
-│                                     │
-├─────────────────────────────────────┤
-│  TabsList (flex-shrink-0)           │  ← Never scrolls, fixed height
+│  ● Meeting (2h)                     │
+│    Team standup                     │  ← Tall card (4x height)
+│    09:00 - 11:00                    │
+│                             2h 0m   │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│  ● Email (25min)            25m     │  ← Short card (1x height)
+│    08:35 - 09:00                    │
 └─────────────────────────────────────┘
 ```
 
 ---
 
-### Why This Works
+### Summary
 
-- **`overflow: hidden` on body**: Prevents any page-level scrolling
-- **`overflow-hidden` on container**: Extra safety to contain all content
-- **`h-screen`**: Container is exactly viewport height
-- **`flex-1`** on content: Takes remaining space after header/footer
-- **`overflow-auto`** in LogsTab: Only the logs list scrolls when content exceeds available space
-
----
-
-### Summary of Changes
-
-| File | Line(s) | Change |
-|------|---------|--------|
-| `src/index.css` | 70 | Change `overflow: auto` to `overflow: hidden` |
-| `src/pages/Index.tsx` | 27 | Add `overflow-hidden` to main container class |
+| File | Changes |
+|------|---------|
+| `src/components/LogItem.tsx` | Add `getCardMinHeight()` function, apply dynamic `minHeight` style |
+| `src/components/GapItem.tsx` | Add `getCardMinHeight()` function, apply dynamic `minHeight` style |
 
