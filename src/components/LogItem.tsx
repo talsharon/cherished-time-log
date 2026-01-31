@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Log } from '@/hooks/useLogs';
 import { useTitles } from '@/hooks/useTitles';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,7 @@ import { Check, X, Trash2, Loader2 } from 'lucide-react';
 
 interface LogItemProps {
   log: Log;
-  onUpdate: (id: string, updates: { title?: string; comment?: string }) => Promise<void>;
+  onUpdate: (id: string, updates: { title?: string; comment?: string; start_time?: string; duration?: number }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }
 
@@ -44,6 +44,19 @@ function formatTimeRange(startTime: string, durationSeconds: number): string {
   return `${startStr} - ${endStr}`;
 }
 
+function formatTimeForInput(date: Date): string {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function parseTimeInput(baseDate: Date, timeStr: string): Date {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const result = new Date(baseDate);
+  result.setHours(hours, minutes, 0, 0);
+  return result;
+}
+
 export function LogItem({ log, onUpdate, onDelete }: LogItemProps) {
   const { titles, getColorForTitle, createTitle } = useTitles();
   const [isOpen, setIsOpen] = useState(false);
@@ -53,10 +66,33 @@ export function LogItem({ log, onUpdate, onDelete }: LogItemProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editStartTime, setEditStartTime] = useState('');
+  const [editEndTime, setEditEndTime] = useState('');
+  const [timeError, setTimeError] = useState<string | null>(null);
 
   const titleColor = getColorForTitle(log.title);
 
+  useEffect(() => {
+    if (isOpen) {
+      const start = new Date(log.start_time);
+      const end = new Date(start.getTime() + log.duration * 1000);
+      setEditStartTime(formatTimeForInput(start));
+      setEditEndTime(formatTimeForInput(end));
+      setTimeError(null);
+    }
+  }, [isOpen, log.start_time, log.duration]);
+
   const handleSave = async () => {
+    // Validate times
+    const baseDate = new Date(log.start_time);
+    const newStart = parseTimeInput(baseDate, editStartTime);
+    const newEnd = parseTimeInput(baseDate, editEndTime);
+    
+    if (newEnd <= newStart) {
+      setTimeError('End time must be after start time');
+      return;
+    }
+    
     setIsSaving(true);
     try {
       // If it's a new title, create it first
@@ -64,9 +100,13 @@ export function LogItem({ log, onUpdate, onDelete }: LogItemProps) {
         await createTitle(editTitle);
       }
       
+      const newDuration = Math.floor((newEnd.getTime() - newStart.getTime()) / 1000);
+      
       await onUpdate(log.id, {
         title: editTitle,
         comment: editComment || undefined,
+        start_time: newStart.toISOString(),
+        duration: newDuration,
       });
       setIsOpen(false);
     } catch (error) {
@@ -178,6 +218,38 @@ export function LogItem({ log, onUpdate, onDelete }: LogItemProps) {
                   Add
                 </Button>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Time</label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <Input
+                    type="time"
+                    value={editStartTime}
+                    onChange={(e) => {
+                      setEditStartTime(e.target.value);
+                      setTimeError(null);
+                    }}
+                    className="h-12"
+                  />
+                </div>
+                <span className="text-muted-foreground">to</span>
+                <div className="flex-1">
+                  <Input
+                    type="time"
+                    value={editEndTime}
+                    onChange={(e) => {
+                      setEditEndTime(e.target.value);
+                      setTimeError(null);
+                    }}
+                    className="h-12"
+                  />
+                </div>
+              </div>
+              {timeError && (
+                <p className="text-sm text-destructive">{timeError}</p>
+              )}
             </div>
 
             <div className="space-y-2">

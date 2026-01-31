@@ -62,7 +62,7 @@ export function useLogs() {
     await fetchLogs();
   }, [user, fetchLogs]);
 
-  const updateLog = useCallback(async (id: string, updates: { title?: string; comment?: string }) => {
+  const updateLog = useCallback(async (id: string, updates: { title?: string; comment?: string; start_time?: string; duration?: number }) => {
     if (!user) return;
 
     const { error } = await supabase
