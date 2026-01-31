@@ -1,146 +1,200 @@
 
 
-## Group Logs by Day with Section Headers
+## Add Start Time and End Time Editing to Log Cards
 
 ### Overview
-Split the logs list into sections grouped by day. Each section will have a header showing the date in a user-friendly format: Today, Yesterday, day name (Sunday-Saturday) for dates within the last week, or the exact date in dd/mm/yyyy format for older entries.
-
----
-
-### Date Label Logic
-
-| Condition | Label Example |
-|-----------|---------------|
-| Same day as today | Today |
-| Previous day | Yesterday |
-| Within last 7 days | Sunday, Monday, etc. |
-| Older than 7 days | 15/01/2024 |
+Add the ability to edit the start time and end time for each log entry using the existing edit dialog. The duration will be calculated automatically from the start and end times. Validation will ensure the end time is always after the start time (error only shown when validation fails).
 
 ---
 
 ### Changes Summary
 
-1. **LogsTab.tsx**: Add grouping logic and render section headers
-2. **LogItem.tsx**: Simplify `formatTimeRange` to only show times (no day prefix)
+1. **useLogs.ts**: Extend the `updateLog` function to accept `start_time` and `duration` fields
+2. **LogItem.tsx**: Add time input fields to the edit dialog with validation
 
 ---
 
-### File: `src/components/LogsTab.tsx`
+### File: `src/hooks/useLogs.ts`
 
-**Add helper functions:**
+**Update the `updateLog` function signature (line 65) to accept additional fields:**
 
 ```typescript
-function getSectionTitle(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  
-  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const nowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  
-  const diffDays = Math.floor((nowStart.getTime() - dateStart.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) {
-    return date.toLocaleDateString([], { weekday: 'long' });
-  }
-  
-  // Format as dd/mm/yyyy
-  const day = date.getDate().toString().padStart(2, '0');
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
-}
-
-function getDateKey(dateStr: string): string {
-  const date = new Date(dateStr);
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-}
-
-function groupLogsByDate(logs: Log[]): Map<string, Log[]> {
-  const groups = new Map<string, Log[]>();
-  
-  for (const log of logs) {
-    const key = getDateKey(log.start_time);
-    if (!groups.has(key)) {
-      groups.set(key, []);
-    }
-    groups.get(key)!.push(log);
-  }
-  
-  return groups;
-}
-```
-
-**Update render to show grouped sections:**
-
-```tsx
-return (
-  <div className="flex-1 overflow-auto px-4 py-4">
-    <div className="space-y-6">
-      {Array.from(groupLogsByDate(logs).entries()).map(([dateKey, dayLogs]) => (
-        <div key={dateKey}>
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">
-            {getSectionTitle(dayLogs[0].start_time)}
-          </h3>
-          <div className="space-y-3">
-            {dayLogs.map((log) => (
-              <LogItem key={log.id} log={log} onUpdate={updateLog} onDelete={deleteLog} />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
+const updateLog = useCallback(async (id: string, updates: { 
+  title?: string; 
+  comment?: string;
+  start_time?: string;
+  duration?: number;
+}) => {
+  // existing implementation remains the same
+}, [user, fetchLogs]);
 ```
 
 ---
 
 ### File: `src/components/LogItem.tsx`
 
-**Simplify `formatTimeRange` to remove day prefix:**
+**1. Update props interface (line 22):**
 
 ```typescript
-function formatTimeRange(startTime: string, durationSeconds: number): string {
-  const start = new Date(startTime);
-  const end = new Date(start.getTime() + durationSeconds * 1000);
-  
-  const startStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const endStr = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  
-  return `${startStr} - ${endStr}`;
+interface LogItemProps {
+  log: Log;
+  onUpdate: (id: string, updates: { 
+    title?: string; 
+    comment?: string;
+    start_time?: string;
+    duration?: number;
+  }) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }
+```
+
+**2. Add helper functions (after formatTimeRange):**
+
+```typescript
+function formatTimeForInput(date: Date): string {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function parseTimeInput(baseDate: Date, timeStr: string): Date {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const result = new Date(baseDate);
+  result.setHours(hours, minutes, 0, 0);
+  return result;
+}
+```
+
+**3. Add new state variables (after line 55):**
+
+```typescript
+const [editStartTime, setEditStartTime] = useState('');
+const [editEndTime, setEditEndTime] = useState('');
+const [timeError, setTimeError] = useState<string | null>(null);
+```
+
+**4. Add useEffect to initialize time values when dialog opens:**
+
+```typescript
+useEffect(() => {
+  if (isOpen) {
+    const start = new Date(log.start_time);
+    const end = new Date(start.getTime() + log.duration * 1000);
+    setEditStartTime(formatTimeForInput(start));
+    setEditEndTime(formatTimeForInput(end));
+    setTimeError(null);
+  }
+}, [isOpen, log.start_time, log.duration]);
+```
+
+**5. Update handleSave to include time validation and changes:**
+
+```typescript
+const handleSave = async () => {
+  // Validate times
+  const baseDate = new Date(log.start_time);
+  const newStart = parseTimeInput(baseDate, editStartTime);
+  const newEnd = parseTimeInput(baseDate, editEndTime);
+  
+  if (newEnd <= newStart) {
+    setTimeError('End time must be after start time');
+    return;
+  }
+  
+  setIsSaving(true);
+  try {
+    if (editTitle !== log.title && !titles.find(t => t.name === editTitle)) {
+      await createTitle(editTitle);
+    }
+    
+    const newDuration = Math.floor((newEnd.getTime() - newStart.getTime()) / 1000);
+    
+    await onUpdate(log.id, {
+      title: editTitle,
+      comment: editComment || undefined,
+      start_time: newStart.toISOString(),
+      duration: newDuration,
+    });
+    setIsOpen(false);
+  } catch (error) {
+    console.error('Error updating log:', error);
+  } finally {
+    setIsSaving(false);
+  }
+};
+```
+
+**6. Add time inputs to the dialog (between Title and Comment sections, after line 181):**
+
+```tsx
+<div className="space-y-2">
+  <label className="text-sm font-medium">Time</label>
+  <div className="flex items-center gap-2">
+    <div className="flex-1">
+      <Input
+        type="time"
+        value={editStartTime}
+        onChange={(e) => {
+          setEditStartTime(e.target.value);
+          setTimeError(null);
+        }}
+        className="h-12"
+      />
+    </div>
+    <span className="text-muted-foreground">to</span>
+    <div className="flex-1">
+      <Input
+        type="time"
+        value={editEndTime}
+        onChange={(e) => {
+          setEditEndTime(e.target.value);
+          setTimeError(null);
+        }}
+        className="h-12"
+      />
+    </div>
+  </div>
+  {timeError && (
+    <p className="text-sm text-destructive">{timeError}</p>
+  )}
+</div>
+```
+
+**7. Add useEffect import (line 1):**
+
+```typescript
+import { useState, useEffect } from 'react';
 ```
 
 ---
 
-### Visual Result
+### Updated Dialog Layout
 
 ```text
-Today
-+----------------------------------------------------+
-| (dot) Work                       1h 30m   [trash]  |
-| Fixed login bug                                    |
-| 10:00 - 11:30                                      |
-+----------------------------------------------------+
-
-Yesterday
-+----------------------------------------------------+
-| (dot) Coding                     2h 15m   [trash]  |
-| 14:00 - 16:15                                      |
-+----------------------------------------------------+
-
-Sunday
-+----------------------------------------------------+
-| (dot) Reading                    1h       [trash]  |
-| 20:00 - 21:00                                      |
-+----------------------------------------------------+
-
-20/01/2026
-+----------------------------------------------------+
-| (dot) Exercise                   45m      [trash]  |
-| 07:00 - 07:45                                      |
-+----------------------------------------------------+
++------------------------------------------+
+|        Edit Activity                 [X] |
+|                                          |
+| Title                                    |
+| [Select dropdown     v]                  |
+| [Or add new title...    ] [Add]          |
+|                                          |
+| Time                                     |
+| [10:00]  to  [11:30]                     |
+|                                          |
+| Comment                                  |
+| [                                    ]   |
+| [                                    ]   |
+|                                          |
+|     [Cancel]          [Save]             |
++------------------------------------------+
 ```
+
+---
+
+### Validation Rules
+
+1. End time must be strictly greater than start time
+2. Error message only displayed when validation fails (no permanent hint label)
+3. Save button triggers validation before saving
+4. Error clears when user modifies either time input
 
