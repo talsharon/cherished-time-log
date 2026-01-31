@@ -2,8 +2,25 @@ import { useState } from 'react';
 import { useLogs, Log } from '@/hooks/useLogs';
 import { useTitlesContext } from '@/contexts/TitlesContext';
 import { LogItem } from '@/components/LogItem';
+import { GapItem } from '@/components/GapItem';
 import { LogDialog } from '@/components/LogDialog';
 import { Loader2, Clock, Plus } from 'lucide-react';
+
+interface Gap {
+  startTime: Date;
+  endTime: Date;
+  duration: number;
+}
+
+function isGap(item: Log | Gap): item is Gap {
+  return 'startTime' in item && item.startTime instanceof Date;
+}
+
+function formatTimeForInput(date: Date): string {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
 
 function getSectionTitle(dateStr: string): string {
   const date = new Date(dateStr);
@@ -45,6 +62,39 @@ function groupLogsByDate(logs: Log[]): Map<string, Log[]> {
   return groups;
 }
 
+function getLogsWithGaps(dayLogs: Log[], minGapMinutes: number = 1): (Log | Gap)[] {
+  const items: (Log | Gap)[] = [];
+  
+  // Sort by start_time descending (most recent first)
+  const sorted = [...dayLogs].sort((a, b) => 
+    new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+  );
+  
+  for (let i = 0; i < sorted.length; i++) {
+    const current = sorted[i];
+    items.push(current);
+    
+    if (i < sorted.length - 1) {
+      const next = sorted[i + 1];
+      const currentStart = new Date(current.start_time);
+      const nextEnd = new Date(new Date(next.start_time).getTime() + next.duration * 1000);
+      
+      const gapMs = currentStart.getTime() - nextEnd.getTime();
+      const gapMinutes = gapMs / (1000 * 60);
+      
+      if (gapMinutes >= minGapMinutes) {
+        items.push({
+          startTime: nextEnd,
+          endTime: currentStart,
+          duration: Math.floor(gapMs / 1000),
+        });
+      }
+    }
+  }
+  
+  return items;
+}
+
 export function LogsTab() {
   const { logs, loading, updateLog, deleteLog, createLog } = useLogs();
   const { loading: titlesLoading } = useTitlesContext();
@@ -52,6 +102,8 @@ export function LogsTab() {
   const [dialogMode, setDialogMode] = useState<'edit' | 'add' | null>(null);
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [gapStartTime, setGapStartTime] = useState<string | undefined>(undefined);
+  const [gapEndTime, setGapEndTime] = useState<string | undefined>(undefined);
 
   const handleEditClick = (log: Log) => {
     setSelectedLog(log);
@@ -60,6 +112,15 @@ export function LogsTab() {
 
   const handleAddClick = (dateFromSection: Date) => {
     setSelectedDate(dateFromSection);
+    setGapStartTime(undefined);
+    setGapEndTime(undefined);
+    setDialogMode('add');
+  };
+
+  const handleGapClick = (gap: Gap) => {
+    setSelectedDate(gap.startTime);
+    setGapStartTime(formatTimeForInput(gap.startTime));
+    setGapEndTime(formatTimeForInput(gap.endTime));
     setDialogMode('add');
   };
 
@@ -67,6 +128,8 @@ export function LogsTab() {
     setDialogMode(null);
     setSelectedLog(null);
     setSelectedDate(null);
+    setGapStartTime(undefined);
+    setGapEndTime(undefined);
   };
 
   if (loading || titlesLoading) {
@@ -106,8 +169,21 @@ export function LogsTab() {
               </button>
             </div>
             <div className="space-y-3">
-              {dayLogs.map((log) => (
-                <LogItem key={log.id} log={log} onEdit={handleEditClick} onDelete={deleteLog} />
+              {getLogsWithGaps(dayLogs).map((item) => (
+                isGap(item) ? (
+                  <GapItem
+                    key={`gap-${item.startTime.getTime()}`}
+                    gap={item}
+                    onClick={() => handleGapClick(item)}
+                  />
+                ) : (
+                  <LogItem
+                    key={item.id}
+                    log={item}
+                    onEdit={handleEditClick}
+                    onDelete={deleteLog}
+                  />
+                )
               ))}
             </div>
           </div>
@@ -122,6 +198,8 @@ export function LogsTab() {
         date={selectedDate ?? undefined}
         onUpdate={updateLog}
         onCreate={createLog}
+        initialStartTime={gapStartTime}
+        initialEndTime={gapEndTime}
       />
     </div>
   );
