@@ -1,151 +1,146 @@
 
 
-## Add End Time Display and Delete Functionality to Log Cards
+## Group Logs by Day with Section Headers
 
 ### Overview
-Update log cards to show start and end times in format "[start time] - [end time]", and add the ability to delete logs with a trash icon and confirmation dialog.
+Split the logs list into sections grouped by day. Each section will have a header showing the date in a user-friendly format: Today, Yesterday, day name (Sunday-Saturday) for dates within the last week, or the exact date in dd/mm/yyyy format for older entries.
+
+---
+
+### Date Label Logic
+
+| Condition | Label Example |
+|-----------|---------------|
+| Same day as today | Today |
+| Previous day | Yesterday |
+| Within last 7 days | Sunday, Monday, etc. |
+| Older than 7 days | 15/01/2024 |
 
 ---
 
 ### Changes Summary
 
-1. Add RLS policy to allow users to delete their own logs
-2. Add `deleteLog` function to `useLogs` hook
-3. Update time display to show time range (start - end)
-4. Add trash icon to log cards with delete confirmation dialog
-5. Update both LogItem component and ClockTab's last log display
-
----
-
-### Database Changes
-
-**Add DELETE RLS Policy for logs table:**
-
-```sql
-CREATE POLICY "Users can delete their own logs"
-ON public.logs
-FOR DELETE
-TO authenticated
-USING (auth.uid() = user_id);
-```
-
----
-
-### File: `src/hooks/useLogs.ts`
-
-Add a new `deleteLog` function after `updateLog`:
-
-```typescript
-const deleteLog = useCallback(async (id: string) => {
-  if (!user) return;
-
-  const { error } = await supabase
-    .from('logs')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', user.id);
-
-  if (error) {
-    console.error('Error deleting log:', error);
-    throw error;
-  }
-
-  await fetchLogs();
-}, [user, fetchLogs]);
-```
-
-Update the return statement to include `deleteLog`.
-
----
-
-### File: `src/components/LogItem.tsx`
-
-1. **Update imports:**
-   - Add `Trash2, Loader2` to lucide-react imports
-   - Import AlertDialog components from `@/components/ui/alert-dialog`
-
-2. **Update props interface:**
-   - Add `onDelete: (id: string) => Promise<void>`
-
-3. **Replace `formatDate` with `formatTimeRange`:**
-   ```typescript
-   function formatTimeRange(startTime: string, durationSeconds: number): string {
-     const start = new Date(startTime);
-     const end = new Date(start.getTime() + durationSeconds * 1000);
-     const now = new Date();
-     const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-     
-     const startStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-     const endStr = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-     
-     let dayPrefix = '';
-     if (diffDays === 0) {
-       dayPrefix = 'Today, ';
-     } else if (diffDays === 1) {
-       dayPrefix = 'Yesterday, ';
-     } else {
-       dayPrefix = start.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ';
-     }
-     
-     return `${dayPrefix}${startStr} - ${endStr}`;
-   }
-   ```
-
-4. **Add state:**
-   - `isDeleteDialogOpen` - controls delete confirmation dialog
-   - `isDeleting` - loading state for delete action
-
-5. **Add handlers:**
-   - `handleDelete` - calls onDelete and closes dialog
-   - `handleTrashClick` - uses stopPropagation and opens delete dialog
-
-6. **Update card layout:**
-   - Change the right side to include both duration and trash icon
-   - Use flex with gap to align them
-
-7. **Add AlertDialog for delete confirmation:**
-   - Title: "Delete Activity"
-   - Description: "Are you sure you want to delete this activity? This action cannot be undone."
-   - Cancel and Delete buttons (Delete uses destructive variant)
+1. **LogsTab.tsx**: Add grouping logic and render section headers
+2. **LogItem.tsx**: Simplify `formatTimeRange` to only show times (no day prefix)
 
 ---
 
 ### File: `src/components/LogsTab.tsx`
 
-- Destructure `deleteLog` from useLogs hook
-- Pass `deleteLog` as `onDelete` prop to LogItem components
+**Add helper functions:**
 
----
+```typescript
+function getSectionTitle(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  
+  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const nowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  const diffDays = Math.floor((nowStart.getTime() - dateStart.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) {
+    return date.toLocaleDateString([], { weekday: 'long' });
+  }
+  
+  // Format as dd/mm/yyyy
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
 
-### File: `src/components/ClockTab.tsx`
+function getDateKey(dateStr: string): string {
+  const date = new Date(dateStr);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
 
-- Replace `formatDate` function with `formatTimeRange` (same implementation as LogItem)
-- Update the last log display to use `formatTimeRange(lastLog.start_time, lastLog.duration)`
+function groupLogsByDate(logs: Log[]): Map<string, Log[]> {
+  const groups = new Map<string, Log[]>();
+  
+  for (const log of logs) {
+    const key = getDateKey(log.start_time);
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key)!.push(log);
+  }
+  
+  return groups;
+}
+```
 
----
+**Update render to show grouped sections:**
 
-### UI Layout for Log Card
-
-```text
-+----------------------------------------------------+
-| (dot) Title                    Duration   [trash]  |
-| Comment text (if any)                              |
-| Today, 10:00 AM - 11:30 AM                         |
-+----------------------------------------------------+
+```tsx
+return (
+  <div className="flex-1 overflow-auto px-4 py-4">
+    <div className="space-y-6">
+      {Array.from(groupLogsByDate(logs).entries()).map(([dateKey, dayLogs]) => (
+        <div key={dateKey}>
+          <h3 className="text-sm font-medium text-muted-foreground mb-3">
+            {getSectionTitle(dayLogs[0].start_time)}
+          </h3>
+          <div className="space-y-3">
+            {dayLogs.map((log) => (
+              <LogItem key={log.id} log={log} onUpdate={updateLog} onDelete={deleteLog} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 ```
 
 ---
 
-### Delete Confirmation Dialog
+### File: `src/components/LogItem.tsx`
+
+**Simplify `formatTimeRange` to remove day prefix:**
+
+```typescript
+function formatTimeRange(startTime: string, durationSeconds: number): string {
+  const start = new Date(startTime);
+  const end = new Date(start.getTime() + durationSeconds * 1000);
+  
+  const startStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const endStr = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  return `${startStr} - ${endStr}`;
+}
+```
+
+---
+
+### Visual Result
 
 ```text
-+------------------------------------------+
-|        Delete Activity                   |
-|                                          |
-| Are you sure you want to delete this     |
-| activity? This action cannot be undone.  |
-|                                          |
-|              [Cancel]  [Delete]          |
-+------------------------------------------+
+Today
++----------------------------------------------------+
+| (dot) Work                       1h 30m   [trash]  |
+| Fixed login bug                                    |
+| 10:00 - 11:30                                      |
++----------------------------------------------------+
+
+Yesterday
++----------------------------------------------------+
+| (dot) Coding                     2h 15m   [trash]  |
+| 14:00 - 16:15                                      |
++----------------------------------------------------+
+
+Sunday
++----------------------------------------------------+
+| (dot) Reading                    1h       [trash]  |
+| 20:00 - 21:00                                      |
++----------------------------------------------------+
+
+20/01/2026
++----------------------------------------------------+
+| (dot) Exercise                   45m      [trash]  |
+| 07:00 - 07:45                                      |
++----------------------------------------------------+
 ```
 
