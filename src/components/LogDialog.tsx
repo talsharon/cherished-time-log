@@ -18,6 +18,9 @@ interface LogDialogProps {
   // For add mode
   date?: Date;
   onCreate?: (startTime: Date, duration: number, title: string, comment?: string) => Promise<void>;
+  // For gap mode (pre-populated times)
+  initialStartTime?: string;
+  initialEndTime?: string;
 }
 
 function formatTimeForInput(date: Date): string {
@@ -50,7 +53,7 @@ function getDefaultEndTime(startTime: string): string {
   return `${endHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 }
 
-export function LogDialog({ mode, isOpen, onOpenChange, log, onUpdate, date, onCreate }: LogDialogProps) {
+export function LogDialog({ mode, isOpen, onOpenChange, log, onUpdate, date, onCreate, initialStartTime, initialEndTime }: LogDialogProps) {
   const { titles, createTitle } = useTitlesContext();
   const [title, setTitle] = useState('Idle');
   const [comment, setComment] = useState('');
@@ -74,14 +77,21 @@ export function LogDialog({ mode, isOpen, onOpenChange, log, onUpdate, date, onC
     } else if (mode === 'add' && date) {
       setTitle('Idle');
       setComment('');
-      const defaultStart = getDefaultStartTime(date);
-      setStartTime(defaultStart);
-      setEndTime(getDefaultEndTime(defaultStart));
+      
+      // Use provided times if available (gap mode), otherwise use defaults
+      if (initialStartTime && initialEndTime) {
+        setStartTime(initialStartTime);
+        setEndTime(initialEndTime);
+      } else {
+        const defaultStart = getDefaultStartTime(date);
+        setStartTime(defaultStart);
+        setEndTime(getDefaultEndTime(defaultStart));
+      }
     }
     
     setTimeError(null);
     setNewTitle('');
-  }, [isOpen, mode, log, date]);
+  }, [isOpen, mode, log, date, initialStartTime, initialEndTime]);
 
   const handleAddNewTitle = async () => {
     if (!newTitle.trim()) return;
