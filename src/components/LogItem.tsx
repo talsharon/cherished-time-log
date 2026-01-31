@@ -19,6 +19,14 @@ interface LogItemProps {
   onDelete: (id: string) => Promise<void>;
 }
 
+function getCardMinHeight(durationSeconds: number): number {
+  const durationMinutes = durationSeconds / 60;
+  const roundedHalfHours = Math.round(durationMinutes / 30);
+  const clampedHalfHours = Math.max(1, Math.min(6, roundedHalfHours));
+  const baseHeight = 80;
+  return baseHeight * clampedHalfHours;
+}
+
 function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
@@ -76,7 +84,8 @@ export function LogItem({ log, onEdit, onDelete }: LogItemProps) {
     <>
       <button
         onClick={() => onEdit(log)}
-        className="w-full rounded-xl bg-secondary/50 p-4 text-left transition-colors active:bg-secondary"
+        className="w-full rounded-xl bg-secondary/50 p-4 text-left transition-colors active:bg-secondary flex flex-col justify-center"
+        style={{ minHeight: getCardMinHeight(log.duration) }}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
