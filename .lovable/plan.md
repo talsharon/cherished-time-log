@@ -1,228 +1,262 @@
 
 
-## Persist Current Title and Comment to Database
+## Consolidate Log Dialog into Single Component with Edit/Add Modes
 
 ### Overview
-Save the currently selected title and comment to the database so that if the user closes or terminates the app, their in-progress activity details are preserved and restored when they return.
+Create a unified `LogDialog` component that handles both editing existing logs and creating new ones. The component will accept a `mode` prop to determine its behavior.
 
 ---
 
 ### Changes Summary
 
-1. **Database Migration**: Add `current_title` and `current_comment` columns to `active_sessions` table
-2. **useActiveSession.ts**: Extend to fetch/update the title and comment
-3. **ClockTab.tsx**: Initialize from saved values and save changes as user types
+1. **LogDialog.tsx**: New unified component with `edit` and `add` modes
+2. **LogItem.tsx**: Remove inline dialog, use LogDialog component
+3. **LogsTab.tsx**: Add plus buttons and use LogDialog for adding entries
 
 ---
 
-### Database Migration
+### File: `src/components/LogDialog.tsx` (New File)
 
-Add two new columns to the `active_sessions` table:
-
-```sql
-ALTER TABLE public.active_sessions
-ADD COLUMN current_title TEXT NOT NULL DEFAULT 'Idle';
-
-ALTER TABLE public.active_sessions
-ADD COLUMN current_comment TEXT;
-```
-
----
-
-### File: `src/hooks/useActiveSession.ts`
-
-**1. Update state to include title and comment:**
+A single dialog component that handles both modes:
 
 ```typescript
-const [startTime, setStartTime] = useState<Date | null>(null);
-const [currentTitle, setCurrentTitle] = useState('Idle');
-const [currentComment, setCurrentComment] = useState('');
-const [loading, setLoading] = useState(true);
-```
-
-**2. Update fetchSession to retrieve title and comment:**
-
-```typescript
-const { data, error } = await supabase
-  .from('active_sessions')
-  .select('current_start_time, current_title, current_comment')
-  .eq('user_id', user.id)
-  .maybeSingle();
-
-if (data) {
-  setStartTime(new Date(data.current_start_time));
-  setCurrentTitle(data.current_title || 'Idle');
-  setCurrentComment(data.current_comment || '');
+interface LogDialogProps {
+  mode: 'edit' | 'add';
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  // For edit mode
+  log?: Log;
+  onUpdate?: (id: string, updates: { title?: string; comment?: string; start_time?: string; duration?: number }) => Promise<void>;
+  // For add mode
+  date?: Date;
+  onCreate?: (startTime: Date, duration: number, title: string, comment?: string) => Promise<void>;
 }
 ```
 
-**3. Add function to update title:**
+**Behavior by mode:**
+
+| Aspect | Edit Mode | Add Mode |
+|--------|-----------|----------|
+| Title | "Edit Activity" | "Add Activity" |
+| Initial title | From `log.title` | "Idle" |
+| Initial comment | From `log.comment` | Empty |
+| Initial times | From `log.start_time` and duration | Smart defaults (see below) |
+| Save action | Calls `onUpdate(log.id, {...})` | Calls `onCreate(startTime, duration, title, comment)` |
+
+**Smart default times for Add mode:**
+- If date is today: Current time rounded to nearest 5 minutes
+- If date is in the past: 09:00
+- End time: Start time + 1 hour
+
+---
+
+### File: `src/components/LogItem.tsx`
+
+**Simplify to just the list item display + delete confirmation:**
+
+1. Remove all dialog-related state (editTitle, editComment, editStartTime, editEndTime, etc.)
+2. Remove the inline Dialog component (lines 177-281)
+3. Keep the button display and delete AlertDialog
+4. Accept a new prop for opening the edit dialog
 
 ```typescript
-const updateTitle = useCallback(async (title: string) => {
-  setCurrentTitle(title);
-  if (!user) return;
-
-  await supabase
-    .from('active_sessions')
-    .update({ current_title: title })
-    .eq('user_id', user.id);
-}, [user]);
+interface LogItemProps {
+  log: Log;
+  onEdit: (log: Log) => void;  // New: opens edit dialog
+  onDelete: (id: string) => Promise<void>;
+}
 ```
 
-**4. Add function to update comment:**
+The component now just renders the log item card and calls `onEdit(log)` when clicked.
+
+---
+
+### File: `src/components/LogsTab.tsx`
+
+**Manage both edit and add dialogs:**
 
 ```typescript
-const updateComment = useCallback(async (comment: string) => {
-  setCurrentComment(comment);
-  if (!user) return;
+// State
+const [dialogMode, setDialogMode] = useState<'edit' | 'add' | null>(null);
+const [selectedLog, setSelectedLog] = useState<Log | null>(null);
+const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  await supabase
-    .from('active_sessions')
-    .update({ current_comment: comment })
-    .eq('user_id', user.id);
-}, [user]);
-```
-
-**5. Update resetSession to clear title and comment:**
-
-```typescript
-const resetSession = useCallback(async () => {
-  if (!user) return;
-
-  const newStartTime = new Date();
-  
-  const { error } = await supabase
-    .from('active_sessions')
-    .update({ 
-      current_start_time: newStartTime.toISOString(),
-      current_title: 'Idle',
-      current_comment: null 
-    })
-    .eq('user_id', user.id);
-
-  if (error) throw error;
-
-  setStartTime(newStartTime);
-  setCurrentTitle('Idle');
-  setCurrentComment('');
-  return newStartTime;
-}, [user]);
-```
-
-**6. Update return object:**
-
-```typescript
-return { 
-  startTime, 
-  currentTitle,
-  currentComment,
-  loading, 
-  resetSession, 
-  updateTitle,
-  updateComment,
-  refetch: fetchSession 
+// Handlers
+const handleEditClick = (log: Log) => {
+  setSelectedLog(log);
+  setDialogMode('edit');
 };
+
+const handleAddClick = (date: Date) => {
+  setSelectedDate(date);
+  setDialogMode('add');
+};
+
+const handleCloseDialog = () => {
+  setDialogMode(null);
+  setSelectedLog(null);
+  setSelectedDate(null);
+};
+```
+
+**Update section headers:**
+```tsx
+<div className="flex items-center justify-between mb-3">
+  <h3 className="text-sm font-medium text-muted-foreground">
+    {getSectionTitle(dayLogs[0].start_time)}
+  </h3>
+  <button
+    onClick={() => handleAddClick(new Date(dayLogs[0].start_time))}
+    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+  >
+    <Plus className="h-4 w-4" />
+  </button>
+</div>
+```
+
+**Render single LogDialog at end:**
+```tsx
+<LogDialog
+  mode={dialogMode === 'edit' ? 'edit' : 'add'}
+  isOpen={dialogMode !== null}
+  onOpenChange={(open) => !open && handleCloseDialog()}
+  log={selectedLog ?? undefined}
+  date={selectedDate ?? undefined}
+  onUpdate={updateLog}
+  onCreate={createLog}
+/>
 ```
 
 ---
 
-### File: `src/components/ClockTab.tsx`
+### Component Structure
 
-**1. Remove local state for title and comment, use from hook:**
-
-```typescript
-// Remove these lines:
-// const [selectedTitle, setSelectedTitle] = useState('Idle');
-// const [comment, setComment] = useState('');
-
-// Use from hook instead:
-const { 
-  startTime, 
-  currentTitle, 
-  currentComment, 
-  loading: sessionLoading, 
-  resetSession,
-  updateTitle,
-  updateComment 
-} = useActiveSession();
+```text
+LogsTab
+├── Day Section Header (with + button)
+│   └── onClick -> handleAddClick(date)
+├── LogItem (simplified, display only)
+│   ├── onClick -> handleEditClick(log)
+│   └── Delete AlertDialog (kept here)
+└── LogDialog (single instance, mode-based)
+    ├── mode="edit" -> shows log data, calls onUpdate
+    └── mode="add" -> shows defaults, calls onCreate
 ```
 
-**2. Update handleTitleChange:**
+---
+
+### LogDialog Internal Logic
 
 ```typescript
-const handleTitleChange = (value: string) => {
-  if (value === CREATE_NEW_VALUE) {
-    setIsNewTitleDialogOpen(true);
-  } else {
-    updateTitle(value);
+// Initialize values based on mode
+useEffect(() => {
+  if (!isOpen) return;
+  
+  if (mode === 'edit' && log) {
+    // Use existing log values
+    setTitle(log.title);
+    setComment(log.comment || '');
+    const start = new Date(log.start_time);
+    const end = new Date(start.getTime() + log.duration * 1000);
+    setStartTime(formatTimeForInput(start));
+    setEndTime(formatTimeForInput(end));
+  } else if (mode === 'add' && date) {
+    // Use smart defaults
+    setTitle('Idle');
+    setComment('');
+    setStartTime(getDefaultStartTime(date));
+    setEndTime(getDefaultEndTime(getDefaultStartTime(date)));
+  }
+  
+  setTimeError(null);
+}, [isOpen, mode, log, date]);
+
+// Handle save
+const handleSave = async () => {
+  // Validate times
+  const baseDate = mode === 'edit' ? new Date(log!.start_time) : date!;
+  const newStart = parseTimeInput(baseDate, startTime);
+  const newEnd = parseTimeInput(baseDate, endTime);
+  
+  if (newEnd <= newStart) {
+    setTimeError('End time must be after start time');
+    return;
+  }
+  
+  const duration = Math.floor((newEnd.getTime() - newStart.getTime()) / 1000);
+  
+  setIsSaving(true);
+  try {
+    // Create title if new
+    if (!titles.find(t => t.name === title)) {
+      await createTitle(title);
+    }
+    
+    if (mode === 'edit') {
+      await onUpdate!(log!.id, {
+        title,
+        comment: comment || undefined,
+        start_time: newStart.toISOString(),
+        duration,
+      });
+    } else {
+      await onCreate!(newStart, duration, title, comment || undefined);
+    }
+    
+    onOpenChange(false);
+  } catch (error) {
+    console.error('Error saving log:', error);
+  } finally {
+    setIsSaving(false);
   }
 };
 ```
 
-**3. Update handleCreateNewTitle:**
+---
+
+### Helper Functions (shared)
+
+Move to LogDialog or a utils file:
 
 ```typescript
-const handleCreateNewTitle = async () => {
-  if (!newTitle.trim()) return;
-  await createTitle(newTitle.trim());
-  updateTitle(newTitle.trim());
-  setNewTitle('');
-  setIsNewTitleDialogOpen(false);
-};
-```
+function formatTimeForInput(date: Date): string {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
 
-**4. Update comment input:**
+function parseTimeInput(baseDate: Date, timeStr: string): Date {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const result = new Date(baseDate);
+  result.setHours(hours, minutes, 0, 0);
+  return result;
+}
 
-```typescript
-<Input
-  placeholder="Add a comment..."
-  value={currentComment}
-  onChange={(e) => updateComment(e.target.value)}
-  className="h-12"
-/>
-```
+function getDefaultStartTime(date: Date): string {
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  
+  if (isToday) {
+    const minutes = Math.floor(now.getMinutes() / 5) * 5;
+    return `${now.getHours().toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  }
+  return '09:00';
+}
 
-**5. Update Select value:**
-
-```typescript
-<Select value={currentTitle} onValueChange={handleTitleChange}>
-```
-
-**6. Update handleDone to use hook values:**
-
-```typescript
-await createLog(startTime, duration, currentTitle, currentComment || undefined);
-// resetSession will automatically clear title and comment
-await resetSession();
-```
-
-**7. Remove manual reset of title/comment after done (handled by resetSession):**
-
-```typescript
-// Remove these lines from handleDone:
-// setSelectedTitle('Idle');
-// setComment('');
+function getDefaultEndTime(startTime: string): string {
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const endHours = (hours + 1) % 24;
+  return `${endHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+}
 ```
 
 ---
 
-### Data Flow
+### Benefits of Consolidation
 
-```text
-User selects title -> updateTitle() -> saves to DB + updates local state
-User types comment -> updateComment() -> saves to DB + updates local state
-User closes app -> data persists in active_sessions
-User reopens app -> fetchSession() -> restores title and comment
-User clicks Done -> resetSession() -> clears title/comment in DB
-```
-
----
-
-### Technical Notes
-
-- Updates to the database happen immediately on change (no debouncing for simplicity)
-- The `resetSession` function clears both title and comment when logging an activity
-- Default title is "Idle" and default comment is null/empty
-- Optimistic updates: local state updates immediately, then syncs to database
+1. **Single source of truth** for dialog UI and validation logic
+2. **Easier maintenance** - changes apply to both modes
+3. **Consistent UX** - identical form layout for edit and add
+4. **Less code duplication** - shared state management and handlers
+5. **Simpler LogItem** - just handles display and delete
 
