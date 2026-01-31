@@ -22,6 +22,19 @@ function formatDuration(seconds: number): string {
   return `${minutes}m`;
 }
 
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) {
+    return `Today, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  } else if (diffDays === 1) {
+    return `Yesterday, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 export function ClockTab() {
   const { startTime, loading: sessionLoading, resetSession } = useActiveSession();
   const { logs, createLog } = useLogs();
@@ -198,30 +211,33 @@ export function ClockTab() {
         </Button>
         
         {/* Last logged event display */}
-        <div className="mt-4 h-16 overflow-hidden">
+        <div className="mt-4 overflow-hidden">
           {lastLog && (
             <div
-              className={`rounded-lg bg-secondary/50 p-3 ${
+              className={`rounded-xl bg-secondary/50 p-4 ${
                 animatingLogId ? 'animate-slide-in-right' : ''
               }`}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span
-                    className="h-3 w-3 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: getColorForTitle(lastLog.title) }}
-                  />
-                  <span className="font-medium text-foreground truncate">{lastLog.title}</span>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="inline-block h-3 w-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: getColorForTitle(lastLog.title) }}
+                    />
+                    <span className="font-medium text-foreground truncate">{lastLog.title}</span>
+                  </div>
+                  {lastLog.comment && (
+                    <p className="mt-1 text-sm text-muted-foreground line-clamp-1">{lastLog.comment}</p>
+                  )}
+                  <p className="mt-2 text-xs text-muted-foreground">{formatDate(lastLog.start_time)}</p>
                 </div>
-                <span className="font-mono text-sm text-muted-foreground flex-shrink-0 ml-2">
-                  {formatDuration(lastLog.duration)}
-                </span>
+                <div className="text-right flex-shrink-0">
+                  <span className="font-mono text-lg font-medium text-foreground">
+                    {formatDuration(lastLog.duration)}
+                  </span>
+                </div>
               </div>
-              {lastLog.comment && (
-                <p className="mt-1 text-xs text-muted-foreground line-clamp-1 pl-5">
-                  {lastLog.comment}
-                </p>
-              )}
             </div>
           )}
         </div>
