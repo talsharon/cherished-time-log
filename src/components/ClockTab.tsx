@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Stopwatch, getElapsedSeconds } from '@/components/Stopwatch';
 import { useActiveSession } from '@/hooks/useActiveSession';
@@ -8,20 +8,44 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Check, Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 const CREATE_NEW_VALUE = '__create_new__';
 
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
 export function ClockTab() {
   const { startTime, loading: sessionLoading, resetSession } = useActiveSession();
-  const { createLog } = useLogs();
+  const { logs, createLog } = useLogs();
   const { titles, getColorForTitle, createTitle } = useTitles();
   const [isSaving, setIsSaving] = useState(false);
   const [selectedTitle, setSelectedTitle] = useState('Idle');
   const [comment, setComment] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [isNewTitleDialogOpen, setIsNewTitleDialogOpen] = useState(false);
+  const [animatingLogId, setAnimatingLogId] = useState<string | null>(null);
+  const [previousLogId, setPreviousLogId] = useState<string | null>(null);
+
+  const lastLog = logs[0];
+
+  // Reset animation state after animation completes
+  useEffect(() => {
+    if (animatingLogId) {
+      const timer = setTimeout(() => {
+        setAnimatingLogId(null);
+        setPreviousLogId(null);
+      }, 600); // 300ms out + 300ms in
+      return () => clearTimeout(timer);
+    }
+  }, [animatingLogId]);
 
   const handleTitleChange = (value: string) => {
     if (value === CREATE_NEW_VALUE) {
@@ -44,10 +68,18 @@ export function ClockTab() {
 
     setIsSaving(true);
     try {
+      // Store the current last log id for animation
+      const currentLastLogId = lastLog?.id || null;
+      setPreviousLogId(currentLastLogId);
+      
       const duration = getElapsedSeconds(startTime);
       
       // Create the log entry with selected title and comment
       await createLog(startTime, duration, selectedTitle, comment || undefined);
+      
+      // Trigger slide-in animation for new log
+      // The new log will be at logs[0] after refetch
+      setAnimatingLogId('new');
       
       // Reset the session and form
       await resetSession();
@@ -164,7 +196,35 @@ export function ClockTab() {
             'DONE'
           )}
         </Button>
-        <p className="mt-4 text-center text-sm text-muted-foreground">Tap to log activity</p>
+        
+        {/* Last logged event display */}
+        <div className="mt-4 h-16 overflow-hidden">
+          {lastLog && (
+            <div
+              className={`rounded-lg bg-secondary/50 p-3 ${
+                animatingLogId ? 'animate-slide-in-right' : ''
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span
+                    className="h-3 w-3 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: getColorForTitle(lastLog.title) }}
+                  />
+                  <span className="font-medium text-foreground truncate">{lastLog.title}</span>
+                </div>
+                <span className="font-mono text-sm text-muted-foreground flex-shrink-0 ml-2">
+                  {formatDuration(lastLog.duration)}
+                </span>
+              </div>
+              {lastLog.comment && (
+                <p className="mt-1 text-xs text-muted-foreground line-clamp-1 pl-5">
+                  {lastLog.comment}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
