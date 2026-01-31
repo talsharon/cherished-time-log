@@ -13,10 +13,18 @@ import { toast } from 'sonner';
 export function ClockTab() {
   const { startTime, loading: sessionLoading, resetSession } = useActiveSession();
   const { createLog } = useLogs();
-  const { titles, getColorForTitle } = useTitles();
+  const { titles, getColorForTitle, createTitle } = useTitles();
   const [isSaving, setIsSaving] = useState(false);
   const [selectedTitle, setSelectedTitle] = useState('Idle');
   const [comment, setComment] = useState('');
+  const [newTitle, setNewTitle] = useState('');
+
+  const handleAddNewTitle = async () => {
+    if (!newTitle.trim()) return;
+    await createTitle(newTitle.trim());
+    setSelectedTitle(newTitle.trim());
+    setNewTitle('');
+  };
 
   const handleDone = async () => {
     if (!startTime || isSaving) return;
@@ -86,6 +94,24 @@ export function ClockTab() {
               ))}
             </SelectContent>
           </Select>
+          
+          <div className="flex gap-2">
+            <Input
+              placeholder="Or add new title..."
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              className="h-10 flex-1 bg-secondary/50"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleAddNewTitle}
+              disabled={!newTitle.trim()}
+              className="h-10 px-3"
+            >
+              Add
+            </Button>
+          </div>
         </div>
 
         <Input
