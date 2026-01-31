@@ -47,19 +47,21 @@ export function ClockTab() {
         <Stopwatch startTime={startTime} />
       </div>
 
-      <Button
-        onClick={handleDone}
-        disabled={isSaving || !startTime}
-        size="lg"
-        className="h-20 w-20 rounded-full text-lg font-semibold shadow-lg shadow-primary/25 transition-transform active:scale-95"
-      >
-        {isSaving ? (
-          <Loader2 className="h-8 w-8 animate-spin" />
-        ) : (
-          <Check className="h-8 w-8" />
-        )}
-      </Button>
-      <p className="mt-4 text-sm text-muted-foreground">Tap to log activity</p>
+      <div className="w-full px-6">
+        <Button
+          onClick={handleDone}
+          disabled={isSaving || !startTime}
+          size="lg"
+          className="w-full h-16 rounded-xl text-lg font-semibold shadow-lg shadow-primary/25 transition-transform active:scale-95"
+        >
+          {isSaving ? (
+            <Loader2 className="h-8 w-8 animate-spin" />
+          ) : (
+            <Check className="h-8 w-8" />
+          )}
+        </Button>
+        <p className="mt-4 text-center text-sm text-muted-foreground">Tap to log activity</p>
+      </div>
     </div>
   );
 }
