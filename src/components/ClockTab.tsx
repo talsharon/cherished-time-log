@@ -60,6 +60,7 @@ export function ClockTab() {
   const [isNewTitleDialogOpen, setIsNewTitleDialogOpen] = useState(false);
   const [animatingLogId, setAnimatingLogId] = useState<string | null>(null);
   const [previousLogId, setPreviousLogId] = useState<string | null>(null);
+  const [isCommentFocused, setIsCommentFocused] = useState(false);
 
   const lastLog = logs[0];
 
@@ -176,6 +177,8 @@ export function ClockTab() {
           placeholder="Add a comment..."
           value={currentComment}
           onChange={(e) => updateComment(e.target.value)}
+          onFocus={() => setIsCommentFocused(true)}
+          onBlur={() => setIsCommentFocused(false)}
           className="h-12"
         />
       </div>
@@ -211,7 +214,7 @@ export function ClockTab() {
       <div className="w-full">
         <Button
           onClick={handleDone}
-          disabled={isSaving || !startTime}
+          disabled={isSaving || !startTime || isCommentFocused}
           size="lg"
           className="w-full h-16 rounded-xl text-lg font-semibold shadow-lg shadow-primary/25 transition-transform active:scale-95"
         >
