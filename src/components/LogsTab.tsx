@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useLogs, Log } from '@/hooks/useLogs';
-import { useTitles } from '@/hooks/useTitles';
+import { useTitlesContext } from '@/contexts/TitlesContext';
 import { LogItem } from '@/components/LogItem';
-import { Loader2, Clock } from 'lucide-react';
+import { LogDialog } from '@/components/LogDialog';
+import { Loader2, Clock, Plus } from 'lucide-react';
 
 function getSectionTitle(dateStr: string): string {
   const date = new Date(dateStr);
@@ -44,8 +46,28 @@ function groupLogsByDate(logs: Log[]): Map<string, Log[]> {
 }
 
 export function LogsTab() {
-  const { logs, loading, updateLog, deleteLog } = useLogs();
-  const { loading: titlesLoading } = useTitles();
+  const { logs, loading, updateLog, deleteLog, createLog } = useLogs();
+  const { loading: titlesLoading } = useTitlesContext();
+  
+  const [dialogMode, setDialogMode] = useState<'edit' | 'add' | null>(null);
+  const [selectedLog, setSelectedLog] = useState<Log | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  const handleEditClick = (log: Log) => {
+    setSelectedLog(log);
+    setDialogMode('edit');
+  };
+
+  const handleAddClick = (dateFromSection: Date) => {
+    setSelectedDate(dateFromSection);
+    setDialogMode('add');
+  };
+
+  const handleCloseDialog = () => {
+    setDialogMode(null);
+    setSelectedLog(null);
+    setSelectedDate(null);
+  };
 
   if (loading || titlesLoading) {
     return (
@@ -72,17 +94,35 @@ export function LogsTab() {
       <div className="space-y-6">
         {Array.from(groupLogsByDate(logs).entries()).map(([dateKey, dayLogs]) => (
           <div key={dateKey}>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">
-              {getSectionTitle(dayLogs[0].start_time)}
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-muted-foreground">
+                {getSectionTitle(dayLogs[0].start_time)}
+              </h3>
+              <button
+                onClick={() => handleAddClick(new Date(dayLogs[0].start_time))}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
             <div className="space-y-3">
               {dayLogs.map((log) => (
-                <LogItem key={log.id} log={log} onUpdate={updateLog} onDelete={deleteLog} />
+                <LogItem key={log.id} log={log} onEdit={handleEditClick} onDelete={deleteLog} />
               ))}
             </div>
           </div>
         ))}
       </div>
+
+      <LogDialog
+        mode={dialogMode === 'edit' ? 'edit' : 'add'}
+        isOpen={dialogMode !== null}
+        onOpenChange={(open) => !open && handleCloseDialog()}
+        log={selectedLog ?? undefined}
+        date={selectedDate ?? undefined}
+        onUpdate={updateLog}
+        onCreate={createLog}
+      />
     </div>
   );
 }
