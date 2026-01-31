@@ -79,5 +79,22 @@ export function useLogs() {
     await fetchLogs();
   }, [user, fetchLogs]);
 
-  return { logs, loading, createLog, updateLog, refetch: fetchLogs };
+  const deleteLog = useCallback(async (id: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('logs')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error deleting log:', error);
+      throw error;
+    }
+
+    await fetchLogs();
+  }, [user, fetchLogs]);
+
+  return { logs, loading, createLog, updateLog, deleteLog, refetch: fetchLogs };
 }

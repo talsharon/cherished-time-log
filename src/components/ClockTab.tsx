@@ -22,17 +22,25 @@ function formatDuration(seconds: number): string {
   return `${minutes}m`;
 }
 
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
+function formatTimeRange(startTime: string, durationSeconds: number): string {
+  const start = new Date(startTime);
+  const end = new Date(start.getTime() + durationSeconds * 1000);
   const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+  const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   
+  const startStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const endStr = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  let dayPrefix = '';
   if (diffDays === 0) {
-    return `Today, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    dayPrefix = 'Today, ';
   } else if (diffDays === 1) {
-    return `Yesterday, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    dayPrefix = 'Yesterday, ';
+  } else {
+    dayPrefix = start.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ';
   }
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  
+  return `${dayPrefix}${startStr} - ${endStr}`;
 }
 
 export function ClockTab() {
@@ -230,7 +238,7 @@ export function ClockTab() {
                   {lastLog.comment && (
                     <p className="mt-1 text-sm text-muted-foreground line-clamp-1">{lastLog.comment}</p>
                   )}
-                  <p className="mt-2 text-xs text-muted-foreground">{formatDate(lastLog.start_time)}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">{formatTimeRange(lastLog.start_time, lastLog.duration)}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <span className="font-mono text-lg font-medium text-foreground">
