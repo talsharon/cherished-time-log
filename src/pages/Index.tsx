@@ -39,16 +39,16 @@ export default function Index() {
         </header>
 
         {/* Main Content with Tabs */}
-        <Tabs defaultValue="clock" className="flex flex-1 flex-col">
-          <TabsContent value="clock" className="m-0 flex flex-1 flex-col data-[state=inactive]:hidden">
+        <Tabs defaultValue="clock" className="flex min-h-0 flex-1 flex-col">
+          <TabsContent value="clock" className="m-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
             <ClockTab />
           </TabsContent>
-          <TabsContent value="logs" className="m-0 flex flex-1 flex-col overflow-hidden data-[state=inactive]:hidden">
+          <TabsContent value="logs" className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden">
             <LogsTab />
           </TabsContent>
 
           {/* Bottom Tab Bar */}
-          <TabsList className="h-auto rounded-none border-t border-border bg-background p-0">
+          <TabsList className="h-auto shrink-0 rounded-none border-t border-border bg-background p-0">
             <TabsTrigger
               value="clock"
               className="flex-1 flex-col gap-1 rounded-none py-3 data-[state=active]:bg-transparent data-[state=active]:text-primary"
