@@ -24,7 +24,7 @@ export default function Index() {
 
   return (
     <TitlesProvider>
-      <div className="flex h-screen flex-col bg-background safe-area-inset-top safe-area-inset-bottom">
+      <div className="flex h-screen flex-col overflow-hidden bg-background safe-area-inset-top safe-area-inset-bottom">
         {/* Header */}
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
           <h1 className="text-lg font-semibold text-foreground">Time Tracker</h1>
