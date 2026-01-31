@@ -41,7 +41,7 @@ export function useLogs() {
     fetchLogs();
   }, [fetchLogs]);
 
-  const createLog = useCallback(async (startTime: Date, duration: number, title: string = 'Idle') => {
+  const createLog = useCallback(async (startTime: Date, duration: number, title: string = 'Idle', comment?: string) => {
     if (!user) return;
 
     const { error } = await supabase
@@ -51,6 +51,7 @@ export function useLogs() {
         start_time: startTime.toISOString(),
         duration,
         title,
+        comment: comment || null,
       });
 
     if (error) {
