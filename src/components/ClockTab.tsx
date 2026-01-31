@@ -126,7 +126,7 @@ export function ClockTab() {
         <div className="space-y-2">
           <Label className="text-base font-medium text-muted-foreground">What are you up to?</Label>
           <Select value={selectedTitle} onValueChange={handleTitleChange}>
-            <SelectTrigger className="h-12 bg-secondary/50">
+            <SelectTrigger className="h-12">
               <SelectValue placeholder="Select activity" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
@@ -164,7 +164,7 @@ export function ClockTab() {
           placeholder="Add a comment..."
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          className="h-12 bg-secondary/50"
+          className="h-12"
         />
       </div>
 
