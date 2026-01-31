@@ -13,7 +13,7 @@ function getCardMinHeight(durationSeconds: number): number {
   const durationMinutes = durationSeconds / 60;
   const roundedHalfHours = Math.round(durationMinutes / 30);
   const clampedHalfHours = Math.max(1, Math.min(6, roundedHalfHours));
-  const baseHeight = 80;
+  const baseHeight = 96;
   return baseHeight * clampedHalfHours;
 }
 
@@ -47,7 +47,7 @@ export function GapItem({ gap, onClick }: GapItemProps) {
   return (
     <button
       onClick={onClick}
-      className="w-full rounded-xl border border-dashed border-muted-foreground/30 bg-secondary/30 p-4 text-left transition-colors active:bg-secondary/50 flex flex-col justify-center"
+      className="w-full rounded-xl border border-dashed border-muted-foreground/30 bg-secondary/30 p-4 text-left transition-colors active:bg-secondary/50 flex flex-col justify-start"
       style={{ minHeight: getCardMinHeight(gap.duration) }}
     >
       <div className="flex items-start justify-between gap-3">

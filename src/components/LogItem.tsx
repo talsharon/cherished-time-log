@@ -23,7 +23,7 @@ function getCardMinHeight(durationSeconds: number): number {
   const durationMinutes = durationSeconds / 60;
   const roundedHalfHours = Math.round(durationMinutes / 30);
   const clampedHalfHours = Math.max(1, Math.min(6, roundedHalfHours));
-  const baseHeight = 80;
+  const baseHeight = 96;
   return baseHeight * clampedHalfHours;
 }
 
@@ -84,7 +84,7 @@ export function LogItem({ log, onEdit, onDelete }: LogItemProps) {
     <>
       <button
         onClick={() => onEdit(log)}
-        className="w-full rounded-xl bg-secondary/50 p-4 text-left transition-colors active:bg-secondary flex flex-col justify-center"
+        className="w-full rounded-xl bg-secondary/50 p-4 text-left transition-colors active:bg-secondary flex flex-col justify-start"
         style={{ minHeight: getCardMinHeight(log.duration) }}
       >
         <div className="flex items-start justify-between gap-3">
