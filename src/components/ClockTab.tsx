@@ -53,27 +53,37 @@ export function ClockTab() {
     updateTitle,
     updateComment 
   } = useActiveSession();
-  const { logs, createLog } = useLogs();
+  const { createLog } = useLogs();
   const { titles, getColorForTitle, createTitle } = useTitles();
   const [isSaving, setIsSaving] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [isNewTitleDialogOpen, setIsNewTitleDialogOpen] = useState(false);
-  const [animatingLogId, setAnimatingLogId] = useState<string | null>(null);
-  const [previousLogId, setPreviousLogId] = useState<string | null>(null);
   const [isCommentFocused, setIsCommentFocused] = useState(false);
+  const [completedLog, setCompletedLog] = useState<{
+    title: string;
+    comment: string | null;
+    duration: number;
+    start_time: string;
+  } | null>(null);
+  const [animationPhase, setAnimationPhase] = useState<'pop-in' | 'slide-out' | null>(null);
 
-  const lastLog = logs[0];
-
-  // Reset animation state after animation completes
+  // Animation sequence orchestration
   useEffect(() => {
-    if (animatingLogId) {
+    if (animationPhase === 'pop-in') {
       const timer = setTimeout(() => {
-        setAnimatingLogId(null);
-        setPreviousLogId(null);
-      }, 600); // 300ms out + 300ms in
+        setAnimationPhase('slide-out');
+      }, 800); // 300ms pop-in + 500ms visible delay
       return () => clearTimeout(timer);
     }
-  }, [animatingLogId]);
+    
+    if (animationPhase === 'slide-out') {
+      const timer = setTimeout(() => {
+        setCompletedLog(null);
+        setAnimationPhase(null);
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [animationPhase]);
 
   const handleTitleChange = (value: string) => {
     if (value === CREATE_NEW_VALUE) {
@@ -96,18 +106,22 @@ export function ClockTab() {
 
     setIsSaving(true);
     try {
-      // Store the current last log id for animation
-      const currentLastLogId = lastLog?.id || null;
-      setPreviousLogId(currentLastLogId);
-      
       const duration = getElapsedSeconds(startTime);
+      
+      // Store log data for animation display
+      const logData = {
+        title: currentTitle,
+        comment: currentComment || null,
+        duration,
+        start_time: startTime.toISOString(),
+      };
       
       // Create the log entry with selected title and comment
       await createLog(startTime, duration, currentTitle, currentComment || undefined);
       
-      // Trigger slide-in animation for new log
-      // The new log will be at logs[0] after refetch
-      setAnimatingLogId('new');
+      // Start animation sequence
+      setCompletedLog(logData);
+      setAnimationPhase('pop-in');
       
       // Reset the session (clears title and comment in DB)
       await resetSession();
@@ -225,37 +239,37 @@ export function ClockTab() {
           )}
         </Button>
         
-        {/* Last logged event display */}
-        <div className="mt-4 overflow-hidden">
-          {lastLog && (
+        {/* Animated completed log card */}
+        {completedLog && (
+          <div className="mt-4 overflow-hidden">
             <div
               className={`rounded-xl bg-secondary/50 p-4 ${
-                animatingLogId ? 'animate-slide-in-right' : ''
-              }`}
+                animationPhase === 'pop-in' ? 'animate-pop-in' : ''
+              } ${animationPhase === 'slide-out' ? 'animate-slide-out-right' : ''}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span
                       className="inline-block h-3 w-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: getColorForTitle(lastLog.title) }}
+                      style={{ backgroundColor: getColorForTitle(completedLog.title) }}
                     />
-                    <span className="font-medium text-foreground truncate">{lastLog.title}</span>
+                    <span className="font-medium text-foreground truncate">{completedLog.title}</span>
                   </div>
-                  {lastLog.comment && (
-                    <p className="mt-1 text-sm text-muted-foreground line-clamp-1">{lastLog.comment}</p>
+                  {completedLog.comment && (
+                    <p className="mt-1 text-sm text-muted-foreground line-clamp-1">{completedLog.comment}</p>
                   )}
-                  <p className="mt-2 text-xs text-muted-foreground">{formatTimeRange(lastLog.start_time, lastLog.duration)}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">{formatTimeRange(completedLog.start_time, completedLog.duration)}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <span className="font-mono text-lg font-medium text-foreground">
-                    {formatDuration(lastLog.duration)}
+                    {formatDuration(completedLog.duration)}
                   </span>
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
