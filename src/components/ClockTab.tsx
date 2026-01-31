@@ -161,7 +161,7 @@ export function ClockTab() {
           {isSaving ? (
             <Loader2 className="h-8 w-8 animate-spin" />
           ) : (
-            <Check className="h-8 w-8" />
+            'DONE'
           )}
         </Button>
         <p className="mt-4 text-center text-sm text-muted-foreground">Tap to log activity</p>
