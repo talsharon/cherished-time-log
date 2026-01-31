@@ -37,22 +37,11 @@ function formatDuration(seconds: number): string {
 function formatTimeRange(startTime: string, durationSeconds: number): string {
   const start = new Date(startTime);
   const end = new Date(start.getTime() + durationSeconds * 1000);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   
   const startStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const endStr = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   
-  let dayPrefix = '';
-  if (diffDays === 0) {
-    dayPrefix = 'Today, ';
-  } else if (diffDays === 1) {
-    dayPrefix = 'Yesterday, ';
-  } else {
-    dayPrefix = start.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ';
-  }
-  
-  return `${dayPrefix}${startStr} - ${endStr}`;
+  return `${startStr} - ${endStr}`;
 }
 
 export function LogItem({ log, onUpdate, onDelete }: LogItemProps) {
