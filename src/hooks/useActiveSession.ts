@@ -83,6 +83,16 @@ export function useActiveSession() {
     return newStartTime;
   }, [user]);
 
+  const updateStartTime = useCallback(async (newStartTime: Date) => {
+    setStartTime(newStartTime);
+    if (!user) return;
+
+    await supabase
+      .from('active_sessions')
+      .update({ current_start_time: newStartTime.toISOString() })
+      .eq('user_id', user.id);
+  }, [user]);
+
   return { 
     startTime, 
     currentTitle,
@@ -91,6 +101,7 @@ export function useActiveSession() {
     resetSession, 
     updateTitle,
     updateComment,
+    updateStartTime,
     refetch: fetchSession 
   };
 }

@@ -51,7 +51,8 @@ export function ClockTab() {
     loading: sessionLoading, 
     resetSession,
     updateTitle,
-    updateComment 
+    updateComment,
+    updateStartTime
   } = useActiveSession();
   const { createLog } = useLogs();
   const { titles, getColorForTitle, createTitle } = useTitles();
@@ -59,6 +60,8 @@ export function ClockTab() {
   const [newTitle, setNewTitle] = useState('');
   const [isNewTitleDialogOpen, setIsNewTitleDialogOpen] = useState(false);
   const [isCommentFocused, setIsCommentFocused] = useState(false);
+  const [isStartTimeDialogOpen, setIsStartTimeDialogOpen] = useState(false);
+  const [editingStartTimeStr, setEditingStartTimeStr] = useState('');
   const [completedLog, setCompletedLog] = useState<{
     title: string;
     comment: string | null;
@@ -99,6 +102,31 @@ export function ClockTab() {
     updateTitle(newTitle.trim());
     setNewTitle('');
     setIsNewTitleDialogOpen(false);
+  };
+
+  const handleStartTimeClick = () => {
+    if (!startTime) return;
+    setEditingStartTimeStr(
+      `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}`
+    );
+    setIsStartTimeDialogOpen(true);
+  };
+
+  const handleSaveStartTime = async () => {
+    if (!startTime || !editingStartTimeStr) return;
+    
+    const [hours, minutes] = editingStartTimeStr.split(':').map(Number);
+    const newStartTime = new Date(startTime);
+    newStartTime.setHours(hours, minutes, 0, 0);
+    
+    if (newStartTime > new Date()) {
+      toast.error('Start time cannot be in the future');
+      return;
+    }
+    
+    await updateStartTime(newStartTime);
+    setIsStartTimeDialogOpen(false);
+    toast.success('Start time updated');
   };
 
   const handleDone = async () => {
@@ -146,7 +174,7 @@ export function ClockTab() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6">
       <div className="mb-8">
-        <Stopwatch startTime={startTime} />
+        <Stopwatch startTime={startTime} onStartTimeClick={handleStartTimeClick} />
       </div>
 
       <div className="w-full space-y-4 mb-8">
@@ -220,6 +248,31 @@ export function ClockTab() {
             </Button>
             <Button onClick={handleCreateNewTitle} disabled={!newTitle.trim()}>
               Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isStartTimeDialogOpen} onOpenChange={setIsStartTimeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Start Time</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Time</Label>
+            <Input
+              type="time"
+              value={editingStartTimeStr}
+              onChange={(e) => setEditingStartTimeStr(e.target.value)}
+              className="h-12"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsStartTimeDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveStartTime} disabled={!editingStartTimeStr}>
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 
 interface StopwatchProps {
   startTime: Date | null;
+  onStartTimeClick?: () => void;
 }
 
 function formatTime(seconds: number): string {
@@ -12,7 +13,7 @@ function formatTime(seconds: number): string {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function Stopwatch({ startTime }: StopwatchProps) {
+export function Stopwatch({ startTime, onStartTimeClick }: StopwatchProps) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -42,9 +43,17 @@ export function Stopwatch({ startTime }: StopwatchProps) {
       <div className="font-mono text-7xl font-light tracking-tight text-foreground tabular-nums">
         {formatTime(elapsed)}
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">
-        {startTime ? `Started ${startTime.toLocaleTimeString()}` : 'Not running'}
-      </p>
+      {startTime ? (
+        <button
+          type="button"
+          onClick={onStartTimeClick}
+          className="mt-2 text-sm text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
+        >
+          Started {startTime.toLocaleTimeString()}
+        </button>
+      ) : (
+        <span className="mt-2 text-sm text-muted-foreground">Not running</span>
+      )}
     </div>
   );
 }
