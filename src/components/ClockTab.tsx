@@ -55,7 +55,7 @@ export function ClockTab() {
     updateComment,
     updateStartTime
   } = useActiveSession();
-  const { createLog } = useLogs();
+  const { logs, createLog, updateLog } = useLogs();
   const { titles, getColorForTitle, createTitle } = useTitles();
   const { mutate: generateInsights, isPending: isGenerating } = useGenerateInsights();
   const [isSaving, setIsSaving] = useState(false);
@@ -124,6 +124,21 @@ export function ClockTab() {
     if (newStartTime > new Date()) {
       toast.error('Start time cannot be in the future');
       return;
+    }
+    
+    // Find the most recent log (logs are ordered by start_time descending)
+    const lastLog = logs[0];
+    
+    if (lastLog) {
+      const lastLogStart = new Date(lastLog.start_time);
+      
+      // Only update if the new start time is after the log's start time
+      if (newStartTime > lastLogStart) {
+        // Calculate new duration: difference between log start and new session start
+        const newDuration = Math.floor((newStartTime.getTime() - lastLogStart.getTime()) / 1000);
+        
+        await updateLog(lastLog.id, { duration: newDuration });
+      }
     }
     
     await updateStartTime(newStartTime);
