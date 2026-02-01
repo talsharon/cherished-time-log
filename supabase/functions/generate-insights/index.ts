@@ -152,17 +152,17 @@ serve(async (req) => {
                   summary: {
                     type: "string",
                     description:
-                      "A comprehensive summary paragraph of the week's activities (3-5 sentences)",
+                      "A comprehensive summary paragraph in HEBREW of the week's activities (3-5 sentences)",
                   },
                   insights: {
                     type: "string",
                     description:
-                      "Detailed insights as formatted text with bullet points and bold headers using ** markdown. Include all relevant observations.",
+                      "Detailed insights in HEBREW as formatted text with bullet points and bold headers using ** markdown. Include all relevant observations.",
                   },
                   recommendations: {
                     type: "string",
                     description:
-                      "Actionable recommendations as formatted text with bullet points and bold headers using ** markdown (3-5 items)",
+                      "Actionable recommendations in HEBREW as formatted text with bullet points and bold headers using ** markdown (3-5 items)",
                   },
                   new_categories: {
                     type: "array",
@@ -335,6 +335,10 @@ function buildPrompt(
 
   return `You are analyzing time tracking data to provide weekly insights for a user.
 
+IMPORTANT: Write ALL text responses (summary, insights, recommendations) in HEBREW (עברית).
+Category names should remain in ENGLISH for consistency.
+Graph titles should be in HEBREW.
+
 TODAY'S DATE: ${currentDate}
 WEEK BEING ANALYZED: ${weekStart} (Sunday) to ${weekEnd} (Saturday)
 
@@ -347,15 +351,15 @@ ${logsJson}
 
 ---
 
-YOUR TASK: Provide a comprehensive weekly analysis with 3 text sections and 2-3 visualizations.
+YOUR TASK: Provide a comprehensive weekly analysis with 3 text sections and 2-3 visualizations. ALL TEXT MUST BE IN HEBREW.
 
 ---
 
 ## 1. SUMMARY
-Write a comprehensive paragraph (3-5 sentences) summarizing the week's activities.
+Write a comprehensive paragraph in HEBREW (3-5 sentences) summarizing the week's activities.
 
 Example output:
-"This week you logged 42 hours of tracked time across 8 different activities. Work-related tasks dominated your schedule, accounting for 60% of your time, with a notable increase in 'Deep Work' sessions compared to last week. You maintained a healthy balance with regular exercise sessions and adequate rest periods. The weekend showed a shift toward entertainment and social activities, which is consistent with your typical patterns."
+"השבוע רשמת 42 שעות מעקב זמן ב-8 פעילויות שונות. משימות הקשורות לעבודה שלטו בלוח הזמנים שלך, והוות 60% מהזמן שלך, עם עלייה ניכרת בפגישות 'עבודה עמוקה' בהשוואה לשבוע שעבר. שמרת על איזון בריא עם אימונים קבועים וזמני מנוחה מספקים. סוף השבוע הראה מעבר לכיוון בידור ופעילויות חברתיות, מה שעולה בקנה אחד עם הדפוסים הרגילים שלך."
 
 Include in your summary:
 - Total tracked time and activity count
@@ -367,30 +371,30 @@ Include in your summary:
 ---
 
 ## 2. INSIGHTS
-Provide detailed insights as formatted text with bullet points. Use **bold** for headers. Be thorough and add any interesting observations.
+Provide detailed insights in HEBREW as formatted text with bullet points. Use **bold** for headers. Be thorough and add any interesting observations.
 
 Example output:
-"**Most Time Spent Categories:**
-- Work: 25.2 hours (60%) - Up 15% from last week
-- Self-improvement: 8.5 hours (20%) - Consistent with average
-- Entertainment: 5.3 hours (13%) - Down 30% from last week
-- Rest: 3 hours (7%) - Below your typical 10%
+"**קטגוריות עם הכי הרבה זמן:**
+- Work: 25.2 שעות (60%) - עלייה של 15% מהשבוע שעבר
+- Self-improvement: 8.5 שעות (20%) - עקבי עם הממוצע
+- Entertainment: 5.3 שעות (13%) - ירידה של 30% מהשבוע שעבר
+- Rest: 3 שעות (7%) - מתחת ל-10% הרגיל שלך
 
-**Unusual Activity Patterns:**
-- You had a 4-hour 'Deep Work' session on Tuesday - your longest uninterrupted work block this month
-- No gym sessions logged on Wednesday, breaking your 6-week streak
-- Late-night coding session on Thursday (11 PM - 2 AM) - first time in 3 weeks
+**דפוסי פעילות חריגים:**
+- היה לך מפגש 'עבודה עמוקה' של 4 שעות ביום שלישי - הבלוק הארוך ביותר שלך החודש
+- לא נרשמו אימונים ביום רביעי, מה ששבר רצף של 6 שבועות
+- מפגש תכנות לילי ביום חמישי (23:00 - 02:00) - פעם ראשונה ב-3 שבועות
 
-**Changes from Past Patterns:**
-- Work hours increased by 5 hours compared to your 4-week average
-- Reading time dropped significantly - only 30 minutes vs your usual 3 hours
-- More fragmented work sessions (average 45 min vs your usual 1.5 hours)
+**שינויים מדפוסי העבר:**
+- שעות העבודה עלו ב-5 שעות בהשוואה לממוצע של 4 שבועות
+- זמן הקריאה ירד משמעותית - רק 30 דקות לעומת 3 שעות הרגילות שלך
+- מפגשי עבודה מפוצלים יותר (ממוצע 45 דקות לעומת שעה וחצי הרגילה)
 
-**Other Observations:**
-- Your most productive day was Tuesday with 9 hours of focused work
-- Weekend activities were well-balanced between rest and entertainment
-- Morning sessions (before 10 AM) were 40% more productive than afternoon ones
-- You're showing signs of increased context-switching this week"
+**תצפיות נוספות:**
+- היום הפרודוקטיבי ביותר שלך היה יום שלישי עם 9 שעות של עבודה ממוקדת
+- פעילויות סוף השבוע היו מאוזנות בין מנוחה לבידור
+- מפגשי בוקר (לפני 10:00) היו פרודוקטיביים ב-40% יותר ממפגשי אחר הצהריים
+- אתה מראה סימנים של עלייה בהחלפת הקשרים השבוע"
 
 You must include these categories but add more if you find interesting patterns:
 - Most time spent categories (with hours and percentages)
@@ -401,20 +405,20 @@ You must include these categories but add more if you find interesting patterns:
 ---
 
 ## 3. RECOMMENDATIONS
-Provide actionable recommendations based on your analysis (3-5 items). Use **bold** for emphasis.
+Provide actionable recommendations in HEBREW based on your analysis (3-5 items). Use **bold** for emphasis.
 
 Example output:
-"**Recommendations:**
+"**המלצות:**
 
-1. **Protect your deep work time** - Your Tuesday 4-hour session was highly productive. Consider blocking similar time slots on other days to maintain focus.
+1. **הגן על זמן העבודה העמוקה שלך** - המפגש של 4 שעות ביום שלישי היה פרודוקטיבי מאוד. שקול לחסום חלונות זמן דומים בימים אחרים.
 
-2. **Resume your gym routine** - You broke a 6-week streak. Getting back on track tomorrow will be easier than waiting until next week.
+2. **חזור לשגרת האימונים** - שברת רצף של 6 שבועות. לחזור למסלול מחר יהיה קל יותר מאשר לחכות לשבוע הבא.
 
-3. **Address the reading decline** - You went from 3 hours to 30 minutes. Even 15 minutes before bed could help rebuild this habit.
+3. **טפל בירידה בקריאה** - עברת מ-3 שעות ל-30 דקות. אפילו 15 דקות לפני השינה יכולות לעזור לבנות מחדש את ההרגל הזה.
 
-4. **Watch your sleep schedule** - The late-night coding session may have impacted your Thursday productivity. Try to maintain consistent sleep hours.
+4. **שמור על לוח זמנים קבוע לשינה** - מפגש התכנות הלילי עשוי להשפיע על הפרודוקטיביות שלך ביום חמישי. נסה לשמור על שעות שינה עקביות.
 
-5. **Reduce context-switching** - Your work sessions are more fragmented than usual. Consider using time-blocking or the Pomodoro technique to maintain longer focus periods."
+5. **הפחת החלפת הקשרים** - מפגשי העבודה שלך מפוצלים יותר מהרגיל. שקול להשתמש בחסימת זמן או בטכניקת פומודורו לשמירה על תקופות מיקוד ארוכות יותר."
 
 Base recommendations on:
 - Broken streaks or habits
@@ -426,18 +430,18 @@ Base recommendations on:
 ---
 
 ## 4. GRAPHS
-Create 2-3 visualizations. All values must be in MINUTES.
+Create 2-3 visualizations. All values must be in MINUTES. Graph TITLES should be in HEBREW.
 
 Required charts:
-1. PIE chart showing time distribution by category for the analyzed week
-2. BAR or LINE chart showing daily totals or category comparison
-3. (Optional) Additional chart revealing an interesting pattern
+1. PIE chart showing time distribution by category for the analyzed week (title in Hebrew, e.g., "התפלגות זמן לפי קטגוריה")
+2. BAR or LINE chart showing daily totals or category comparison (title in Hebrew)
+3. (Optional) Additional chart revealing an interesting pattern (title in Hebrew)
 
 Chart data format:
-- PIE/BAR: { name: "Category Name", value: 120 } (value in minutes)
+- PIE/BAR: { name: "Category Name", value: 120 } (value in minutes, category names in ENGLISH)
 - LINE: { name: "Day", value: 480, date: "2026-01-27" } (date in YYYY-MM-DD)
 
 ---
 
-Call the submit_weekly_analysis function with your complete analysis.`;
+Call the submit_weekly_analysis function with your complete analysis in HEBREW.`;
 }
