@@ -41,6 +41,30 @@ export type Database = {
         }
         Relationships: []
       }
+      categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       logs: {
         Row: {
           comment: string | null
@@ -92,6 +116,42 @@ export type Database = {
           id?: string
           name?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      weekly_insights: {
+        Row: {
+          created_at: string
+          graphs: Json
+          id: string
+          insights: string
+          recommendations: string
+          summary: string
+          user_id: string
+          week_end: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          graphs?: Json
+          id?: string
+          insights: string
+          recommendations: string
+          summary: string
+          user_id: string
+          week_end: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          graphs?: Json
+          id?: string
+          insights?: string
+          recommendations?: string
+          summary?: string
+          user_id?: string
+          week_end?: string
+          week_start?: string
         }
         Relationships: []
       }
