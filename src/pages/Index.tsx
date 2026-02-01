@@ -3,8 +3,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClockTab } from '@/components/ClockTab';
 import { LogsTab } from '@/components/LogsTab';
+import { InsightsTab } from '@/components/InsightsTab';
 import { Button } from '@/components/ui/button';
-import { Clock, List, LogOut } from 'lucide-react';
+import { Clock, List, LogOut, Lightbulb } from 'lucide-react';
 import { TitlesProvider } from '@/contexts/TitlesContext';
 
 export default function Index() {
@@ -46,6 +47,9 @@ export default function Index() {
           <TabsContent value="logs" className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden">
             <LogsTab />
           </TabsContent>
+          <TabsContent value="insights" className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden">
+            <InsightsTab />
+          </TabsContent>
 
           {/* Bottom Tab Bar */}
           <TabsList className="h-auto shrink-0 rounded-none border-t border-border bg-background p-0">
@@ -62,6 +66,13 @@ export default function Index() {
             >
               <List className="h-5 w-5" />
               <span className="text-xs">Logs</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="insights"
+              className="flex-1 flex-col gap-1 rounded-none py-3 data-[state=active]:bg-transparent data-[state=active]:text-primary"
+            >
+              <Lightbulb className="h-5 w-5" />
+              <span className="text-xs">Insights</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>

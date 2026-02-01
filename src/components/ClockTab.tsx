@@ -4,11 +4,12 @@ import { Stopwatch, getElapsedSeconds } from '@/components/Stopwatch';
 import { useActiveSession } from '@/hooks/useActiveSession';
 import { useLogs } from '@/hooks/useLogs';
 import { useTitles } from '@/hooks/useTitles';
+import { useGenerateInsights } from '@/hooks/useWeeklyInsights';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 const CREATE_NEW_VALUE = '__create_new__';
@@ -56,6 +57,7 @@ export function ClockTab() {
   } = useActiveSession();
   const { createLog } = useLogs();
   const { titles, getColorForTitle, createTitle } = useTitles();
+  const { mutate: generateInsights, isPending: isGenerating } = useGenerateInsights();
   const [isSaving, setIsSaving] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [isNewTitleDialogOpen, setIsNewTitleDialogOpen] = useState(false);
@@ -172,7 +174,23 @@ export function ClockTab() {
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-6">
+    <div className="flex flex-1 flex-col items-center justify-center px-6 relative">
+      {/* Generate Insights Button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => generateInsights()}
+        disabled={isGenerating}
+        className="absolute top-4 right-0 h-9 w-9 text-muted-foreground hover:text-primary"
+        title="Generate weekly insights"
+      >
+        {isGenerating ? (
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : (
+          <Sparkles className="h-5 w-5" />
+        )}
+      </Button>
+
       <div className="mb-8">
         <Stopwatch startTime={startTime} onStartTimeClick={handleStartTimeClick} />
       </div>
