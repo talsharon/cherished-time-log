@@ -1,93 +1,101 @@
 
 
-## Hebrew Language Support for AI Insights
+## Update Previous Log When Editing Session Start Time
 
 ### Overview
 
-Update the AI prompt in the `generate-insights` edge function to instruct the model to return all text responses (summary, insights, recommendations) in Hebrew, while keeping category names in English.
+When the user edits the current session's start time, the system should also update the most recent log entry's duration so that the previous log's end time equals the new start time. This ensures temporal continuity between the last logged activity and the current session.
 
-### Changes Required
-
-#### File: `supabase/functions/generate-insights/index.ts`
-
-**1. Add Language Instruction to Prompt**
-
-Add a clear language directive at the beginning of the prompt and update the example outputs to be in Hebrew.
+### How It Works
 
 ```text
-IMPORTANT: Write ALL text responses (summary, insights, recommendations) in HEBREW (עברית).
-Category names should remain in ENGLISH for consistency.
-Graph titles should be in HEBREW.
+Current Behavior:
+┌──────────────────┐  ┌──────────────────┐
+│   Previous Log   │  │ Active Session   │
+│ 10:00 - 11:00    │  │ Started: 11:30   │  ← Gap between 11:00 and 11:30
+└──────────────────┘  └──────────────────┘
+
+New Behavior (after editing start time to 11:15):
+┌──────────────────┐  ┌──────────────────┐
+│   Previous Log   │  │ Active Session   │
+│ 10:00 - 11:15    │  │ Started: 11:15   │  ← End time adjusted to match
+└──────────────────┘  └──────────────────┘
 ```
 
-**2. Update Example Outputs**
+### Technical Changes
 
-Change the example outputs in each section to Hebrew equivalents:
+#### 1. Modify `handleSaveStartTime` in `ClockTab.tsx`
 
-**Summary Example (Hebrew):**
-```text
-"השבוע רשמת 42 שעות מעקב זמן ב-8 פעילויות שונות. משימות הקשורות לעבודה שלטו בלוח הזמנים שלך, והוות 60% מהזמן שלך, עם עלייה ניכרת בפגישות 'עבודה עמוקה' בהשוואה לשבוע שעבר. שמרת על איזון בריא עם אימונים קבועים וזמני מנוחה מספקים. סוף השבוע הראה מעבר לכיוון בידור ופעילויות חברתיות, מה שעולה בקנה אחד עם הדפוסים הרגילים שלך."
-```
+The function needs to:
+1. Get the most recent log entry
+2. Calculate the new duration for that log based on the new session start time
+3. Update the log's duration in the database
+4. Update the active session's start time
 
-**Insights Example (Hebrew):**
-```text
-"**קטגוריות עם הכי הרבה זמן:**
-- Work: 25.2 שעות (60%) - עלייה של 15% מהשבוע שעבר
-- Self-improvement: 8.5 שעות (20%) - עקבי עם הממוצע
-- Entertainment: 5.3 שעות (13%) - ירידה של 30% מהשבוע שעבר
+#### 2. Access `logs` and `updateLog` from `useLogs` hook
 
-**דפוסי פעילות חריגים:**
-- היה לך מפגש 'עבודה עמוקה' של 4 שעות ביום שלישי - הבלוק הארוך ביותר שלך החודש
-- לא נרשמו אימונים ביום רביעי, מה ששבר רצף של 6 שבועות
+The ClockTab already imports `useLogs` but only uses `createLog`. We need to also use `logs` and `updateLog`.
 
-**שינויים מדפוסי העבר:**
-- שעות העבודה עלו ב-5 שעות בהשוואה לממוצע של 4 שבועות
-- זמן הקריאה ירד משמעותית - רק 30 דקות לעומת 3 שעות הרגילות שלך"
-```
+### Implementation Details
 
-**Recommendations Example (Hebrew):**
-```text
-"**המלצות:**
-
-1. **הגן על זמן העבודה העמוקה שלך** - המפגש של 4 שעות ביום שלישי היה פרודוקטיבי מאוד. שקול לחסום חלונות זמן דומים בימים אחרים.
-
-2. **חזור לשגרת האימונים** - שברת רצף של 6 שבועות. לחזור למסלול מחר יהיה קל יותר מאשר לחכות לשבוע הבא.
-
-3. **טפל בירידה בקריאה** - עברת מ-3 שעות ל-30 דקות. אפילו 15 דקות לפני השינה יכולות לעזור לבנות מחדש את ההרגל הזה."
-```
-
-**3. Update Tool Schema Descriptions**
-
-Update the tool parameter descriptions to specify Hebrew output:
+**File: `src/components/ClockTab.tsx`**
 
 ```typescript
-summary: {
-  type: "string",
-  description: "A comprehensive summary paragraph in HEBREW of the week's activities (3-5 sentences)"
-},
-insights: {
-  type: "string",
-  description: "Detailed insights in HEBREW as formatted text with bullet points and bold headers using ** markdown"
-},
-recommendations: {
-  type: "string",
-  description: "Actionable recommendations in HEBREW as formatted text with bullet points and bold headers"
-}
+// Current usage (line 58):
+const { createLog } = useLogs();
+
+// Updated usage:
+const { logs, createLog, updateLog } = useLogs();
 ```
 
-### Summary of Changes
+**Updated `handleSaveStartTime` function:**
 
-| Location | Change |
-|----------|--------|
-| Prompt header | Add language instruction (Hebrew for text, English for categories) |
-| Summary example | Replace with Hebrew example |
-| Insights example | Replace with Hebrew example (category names stay English) |
-| Recommendations example | Replace with Hebrew example |
-| Tool schema descriptions | Add "in HEBREW" to summary, insights, recommendations descriptions |
+```typescript
+const handleSaveStartTime = async () => {
+  if (!startTime || !editingStartTimeStr) return;
+  
+  const [hours, minutes] = editingStartTimeStr.split(':').map(Number);
+  const newStartTime = new Date(startTime);
+  newStartTime.setHours(hours, minutes, 0, 0);
+  
+  if (newStartTime > new Date()) {
+    toast.error('Start time cannot be in the future');
+    return;
+  }
+  
+  // Find the most recent log (logs are ordered by start_time descending)
+  const lastLog = logs[0];
+  
+  if (lastLog) {
+    const lastLogStart = new Date(lastLog.start_time);
+    
+    // Only update if the new start time is after the log's start time
+    if (newStartTime > lastLogStart) {
+      // Calculate new duration: difference between log start and new session start
+      const newDuration = Math.floor((newStartTime.getTime() - lastLogStart.getTime()) / 1000);
+      
+      await updateLog(lastLog.id, { duration: newDuration });
+    }
+  }
+  
+  await updateStartTime(newStartTime);
+  setIsStartTimeDialogOpen(false);
+  toast.success('Start time updated');
+};
+```
+
+### Edge Cases Handled
+
+| Scenario | Behavior |
+|----------|----------|
+| No previous logs exist | Only update session start time |
+| New start time is before the last log's start time | Only update session start time (don't create negative duration) |
+| New start time is after the last log's end time | Extend the last log's duration to meet the new start time |
+| New start time is before the last log's end time | Shrink the last log's duration |
 
 ### Files Modified
 
-| File | Action |
+| File | Change |
 |------|--------|
-| `supabase/functions/generate-insights/index.ts` | Modify `buildPrompt()` function and tool schema |
+| `src/components/ClockTab.tsx` | Update `handleSaveStartTime` to also adjust the previous log's duration |
 
