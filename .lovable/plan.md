@@ -1,170 +1,188 @@
 
 
-## Pop-in and Slide-out Animation for Logged Activity
+## Edit Current Start Time (Time Only)
 
 ### Overview
 
-Replace the permanent last log card with a temporary animated card that appears only when tapping "DONE". The card will pop in, pause briefly, then slide out to the right and disappear.
+Allow users to tap on the "Started [time]" text in the Stopwatch to open a dialog where they can edit the session's start time. Only the time component is editable - the date remains unchanged.
 
-### Animation Sequence
+### User Flow
 
 ```text
-[DONE tapped]
+User sees: "Started 2:30:45 PM"
      |
+     | (taps)
      v
-+------------------+
-|  Card pops in    |  <- scale from 0.8 to 1, opacity 0 to 1 (300ms, ease-out)
-+------------------+
++------------------------+
+|  Edit Start Time       |
+|                        |
+|  Time: [14:30]         |
+|                        |
+|  [Cancel]    [Save]    |
++------------------------+
      |
-     | (500ms delay)
+     | (saves)
      v
-+------------------+
-|  Card slides out |  <- translate X 0 to 100%, opacity 1 to 0 (400ms, ease-in)
-+------------------+
-     |
-     v
-[Card hidden]
+Stopwatch updates with new elapsed time
 ```
 
 ---
 
 ### Technical Approach
 
-#### 1. New State Structure
+#### 1. Add `updateStartTime` to `useActiveSession` hook
 
-Replace `animatingLogId` and `previousLogId` with:
-- `completedLog`: Stores the log data to display in the animated card (null when not showing)
-- `animationPhase`: Tracks current animation phase ('pop-in' | 'visible' | 'slide-out' | null)
+Create a new function that updates the `current_start_time` in the database and local state.
 
-#### 2. New Keyframe Animations
+#### 2. Make "Started" text tappable in Stopwatch
 
-Add to `tailwind.config.ts`:
-- `pop-in`: Scale from 0.8 to 1 with opacity fade in (ease-out)
-- `slide-out-right`: Translate X from 0 to 100% with opacity fade out (ease-in)
+Add an `onStartTimeClick` callback prop to `Stopwatch` component and style the text as interactive.
 
-#### 3. Animation Flow in handleDone
+#### 3. Add Start Time Edit Dialog in ClockTab
 
-1. Store the log data (title, comment, duration, start_time) before creating
-2. Create the log in database
-3. Set `animationPhase` to 'pop-in' and populate `completedLog`
-4. After 300ms (pop-in duration), set phase to 'visible'
-5. After 500ms delay, set phase to 'slide-out'
-6. After 400ms (slide-out duration), clear `completedLog` and phase
+Create a simple dialog with just a time input. Preserve the original date and only update the hours/minutes.
 
 ---
 
 ### File Changes
 
-#### `tailwind.config.ts`
+#### `src/hooks/useActiveSession.ts`
 
-Add new keyframes:
-
-```typescript
-"pop-in": {
-  "0%": { transform: "scale(0.8)", opacity: "0" },
-  "100%": { transform: "scale(1)", opacity: "1" },
-},
-"slide-out-right": {
-  "0%": { transform: "translateX(0)", opacity: "1" },
-  "100%": { transform: "translateX(100%)", opacity: "0" },
-},
-```
-
-Add new animations:
+Add new `updateStartTime` function:
 
 ```typescript
-"pop-in": "pop-in 0.3s ease-out forwards",
-"slide-out-right": "slide-out-right 0.4s ease-in forwards",
+const updateStartTime = useCallback(async (newStartTime: Date) => {
+  setStartTime(newStartTime);
+  if (!user) return;
+
+  await supabase
+    .from('active_sessions')
+    .update({ current_start_time: newStartTime.toISOString() })
+    .eq('user_id', user.id);
+}, [user]);
 ```
+
+Export it in the return object.
+
+---
+
+#### `src/components/Stopwatch.tsx`
+
+Update props interface:
+
+```typescript
+interface StopwatchProps {
+  startTime: Date | null;
+  onStartTimeClick?: () => void;
+}
+```
+
+Make the "Started" text tappable:
+
+```tsx
+{startTime ? (
+  <button
+    type="button"
+    onClick={onStartTimeClick}
+    className="text-sm text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
+  >
+    Started {startTime.toLocaleTimeString()}
+  </button>
+) : (
+  <span className="text-sm text-muted-foreground">Not running</span>
+)}
+```
+
+---
 
 #### `src/components/ClockTab.tsx`
 
-**Remove:**
-- `animatingLogId` and `previousLogId` state
-- The animation reset useEffect
-- The permanent last log display (lines 228-258)
+**Add new state:**
+```typescript
+const [isStartTimeDialogOpen, setIsStartTimeDialogOpen] = useState(false);
+const [editingStartTimeStr, setEditingStartTimeStr] = useState('');
+```
 
-**Add:**
-- `completedLog` state to store the log data for animation
-- `animationPhase` state to track animation progress
-- New useEffect to orchestrate the animation sequence
-- Temporary card component that only renders during animation
+**Add `updateStartTime` to hook destructuring:**
+```typescript
+const { 
+  startTime, 
+  currentTitle, 
+  currentComment, 
+  loading: sessionLoading, 
+  resetSession,
+  updateTitle,
+  updateComment,
+  updateStartTime  // <-- add this
+} = useActiveSession();
+```
 
-**Updated handleDone:**
+**Add handler functions:**
 
 ```typescript
-const handleDone = async () => {
-  if (!startTime || isSaving) return;
+const handleStartTimeClick = () => {
+  if (!startTime) return;
+  setEditingStartTimeStr(
+    `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}`
+  );
+  setIsStartTimeDialogOpen(true);
+};
 
-  setIsSaving(true);
-  try {
-    const duration = getElapsedSeconds(startTime);
-    
-    // Store log data for animation display
-    const logData = {
-      title: currentTitle,
-      comment: currentComment || null,
-      duration,
-      start_time: startTime.toISOString(),
-    };
-    
-    // Create the log entry
-    await createLog(startTime, duration, currentTitle, currentComment || undefined);
-    
-    // Start animation sequence
-    setCompletedLog(logData);
-    setAnimationPhase('pop-in');
-    
-    // Reset the session
-    await resetSession();
-    
-    toast.success('Activity logged!');
-  } catch (error) {
-    console.error('Error saving log:', error);
-    toast.error('Failed to save activity');
-  } finally {
-    setIsSaving(false);
+const handleSaveStartTime = async () => {
+  if (!startTime || !editingStartTimeStr) return;
+  
+  const [hours, minutes] = editingStartTimeStr.split(':').map(Number);
+  const newStartTime = new Date(startTime); // Keep original date
+  newStartTime.setHours(hours, minutes, 0, 0);
+  
+  // Validate: start time cannot be in the future
+  if (newStartTime > new Date()) {
+    toast.error('Start time cannot be in the future');
+    return;
   }
+  
+  await updateStartTime(newStartTime);
+  setIsStartTimeDialogOpen(false);
+  toast.success('Start time updated');
 };
 ```
 
-**Animation orchestration useEffect:**
-
-```typescript
-useEffect(() => {
-  if (animationPhase === 'pop-in') {
-    // After pop-in completes (300ms), wait then slide out
-    const timer = setTimeout(() => {
-      setAnimationPhase('slide-out');
-    }, 800); // 300ms pop-in + 500ms visible delay
-    return () => clearTimeout(timer);
-  }
-  
-  if (animationPhase === 'slide-out') {
-    // After slide-out completes (400ms), clear everything
-    const timer = setTimeout(() => {
-      setCompletedLog(null);
-      setAnimationPhase(null);
-    }, 400);
-    return () => clearTimeout(timer);
-  }
-}, [animationPhase]);
-```
-
-**Animated card JSX (replaces last log display):**
+**Update Stopwatch usage:**
 
 ```tsx
-{completedLog && (
-  <div className="mt-4 overflow-hidden">
-    <div
-      className={`rounded-xl bg-secondary/50 p-4 ${
-        animationPhase === 'pop-in' ? 'animate-pop-in' : ''
-      } ${animationPhase === 'slide-out' ? 'animate-slide-out-right' : ''}`}
-    >
-      {/* Card content with completedLog data */}
+<Stopwatch 
+  startTime={startTime} 
+  onStartTimeClick={handleStartTimeClick}
+/>
+```
+
+**Add new dialog (after the Create New Title dialog):**
+
+```tsx
+<Dialog open={isStartTimeDialogOpen} onOpenChange={setIsStartTimeDialogOpen}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Edit Start Time</DialogTitle>
+    </DialogHeader>
+    <div className="space-y-2">
+      <Label>Time</Label>
+      <Input
+        type="time"
+        value={editingStartTimeStr}
+        onChange={(e) => setEditingStartTimeStr(e.target.value)}
+        className="h-12"
+      />
     </div>
-  </div>
-)}
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setIsStartTimeDialogOpen(false)}>
+        Cancel
+      </Button>
+      <Button onClick={handleSaveStartTime} disabled={!editingStartTimeStr}>
+        Save
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
 ```
 
 ---
@@ -173,6 +191,7 @@ useEffect(() => {
 
 | File | Changes |
 |------|---------|
-| `tailwind.config.ts` | Add `pop-in` and `slide-out-right` keyframes and animations |
-| `src/components/ClockTab.tsx` | Replace permanent last log with animated temporary card, add animation state management |
+| `src/hooks/useActiveSession.ts` | Add `updateStartTime` function to update start time in DB and state |
+| `src/components/Stopwatch.tsx` | Add `onStartTimeClick` prop, make "Started" text tappable with hover styles |
+| `src/components/ClockTab.tsx` | Add start time edit dialog with time-only input, validation for future times |
 
