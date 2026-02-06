@@ -216,10 +216,10 @@ export function ClockTab() {
           variant="outline"
           size="icon"
           onClick={resetTacticalTimer}
-          className="h-8 w-8 rounded-full"
+          className="h-10 w-10 rounded-full"
           title="Reset tactical timer"
         >
-          <RotateCcw className="h-4 w-4" />
+          <RotateCcw className="h-5 w-5" />
         </Button>
       </div>
 
