@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Loader2, Plus, Sparkles } from 'lucide-react';
+import { Loader2, Plus, RotateCcw, Sparkles } from 'lucide-react';
+import { TacticalStopwatch } from '@/components/TacticalStopwatch';
 import { toast } from 'sonner';
 
 const CREATE_NEW_VALUE = '__create_new__';
@@ -47,10 +48,12 @@ function formatTimeRange(startTime: string, durationSeconds: number): string {
 export function ClockTab() {
   const { 
     startTime, 
+    tacticalStartTime,
     currentTitle, 
     currentComment, 
     loading: sessionLoading, 
     resetSession,
+    resetTacticalTimer,
     updateTitle,
     updateComment,
     updateStartTime
@@ -205,6 +208,20 @@ export function ClockTab() {
           <Sparkles className="h-5 w-5" />
         )}
       </Button>
+
+      {/* Tactical Stopwatch */}
+      <div className="flex items-center gap-3 mb-4">
+        <TacticalStopwatch startTime={tacticalStartTime} />
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={resetTacticalTimer}
+          className="h-8 w-8 rounded-full"
+          title="Reset tactical timer"
+        >
+          <RotateCcw className="h-4 w-4" />
+        </Button>
+      </div>
 
       <div className="mb-8">
         <Stopwatch startTime={startTime} onStartTimeClick={handleStartTimeClick} />

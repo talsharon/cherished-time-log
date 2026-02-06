@@ -21,6 +21,7 @@ export type Database = {
           current_start_time: string
           current_title: string
           id: string
+          tactical_start_time: string | null
           user_id: string
         }
         Insert: {
@@ -29,6 +30,7 @@ export type Database = {
           current_start_time?: string
           current_title?: string
           id?: string
+          tactical_start_time?: string | null
           user_id: string
         }
         Update: {
@@ -37,6 +39,7 @@ export type Database = {
           current_start_time?: string
           current_title?: string
           id?: string
+          tactical_start_time?: string | null
           user_id?: string
         }
         Relationships: []
