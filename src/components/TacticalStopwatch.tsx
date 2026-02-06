@@ -33,7 +33,7 @@ export function TacticalStopwatch({ startTime }: TacticalStopwatchProps) {
   }, [startTime]);
 
   return (
-    <div className="font-mono text-2xl font-light tracking-tight text-muted-foreground tabular-nums">
+    <div className="font-mono text-4xl font-light tracking-tight text-muted-foreground tabular-nums">
       {formatTime(elapsed)}
     </div>
   );
