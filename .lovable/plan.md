@@ -1,101 +1,132 @@
 
 
-## Update Previous Log When Editing Session Start Time
+## Secondary Tactical Stopwatch with Persistence
 
 ### Overview
 
-When the user edits the current session's start time, the system should also update the most recent log entry's duration so that the previous log's end time equals the new start time. This ensures temporal continuity between the last logged activity and the current session.
+Add a secondary "tactical" stopwatch above the main clock for inner time counting. Unlike the original plan, this stopwatch will persist its start time to the database so it survives app restarts/kills.
 
-### How It Works
+### Visual Layout
 
 ```text
-Current Behavior:
-┌──────────────────┐  ┌──────────────────┐
-│   Previous Log   │  │ Active Session   │
-│ 10:00 - 11:00    │  │ Started: 11:30   │  ← Gap between 11:00 and 11:30
-└──────────────────┘  └──────────────────┘
-
-New Behavior (after editing start time to 11:15):
-┌──────────────────┐  ┌──────────────────┐
-│   Previous Log   │  │ Active Session   │
-│ 10:00 - 11:15    │  │ Started: 11:15   │  ← End time adjusted to match
-└──────────────────┘  └──────────────────┘
+┌─────────────────────────────────────────┐
+│  [Sparkles Button]          (top right) │
+│                                         │
+│         ┌─────────────────────┐         │
+│         │    00:05:23         │  [⟲]   │  ← Tactical stopwatch (smaller) + Reset button
+│         └─────────────────────┘         │
+│                                         │
+│            00:45:12                     │  ← Main stopwatch (large)
+│         Started 10:30:00 AM             │
+│                                         │
+│      What are you up to?                │
+│      [Select activity    ▼]             │
+│      [Add a comment...     ]            │
+│                                         │
+│      ┌─────────────────────┐            │
+│      │        DONE         │            │
+│      └─────────────────────┘            │
+└─────────────────────────────────────────┘
 ```
 
-### Technical Changes
+### Behavior
 
-#### 1. Modify `handleSaveStartTime` in `ClockTab.tsx`
+| Action | Tactical Stopwatch Behavior |
+|--------|------------------------------|
+| Main session starts (first login) | Tactical starts from same time |
+| Reset button clicked | Resets to current time and saves to DB |
+| DONE button clicked | Resets to current time (same as main session) |
+| App killed/refreshed | Restores from saved start time in DB |
 
-The function needs to:
-1. Get the most recent log entry
-2. Calculate the new duration for that log based on the new session start time
-3. Update the log's duration in the database
-4. Update the active session's start time
+### Technical Implementation
 
-#### 2. Access `logs` and `updateLog` from `useLogs` hook
+#### 1. Database Migration
 
-The ClockTab already imports `useLogs` but only uses `createLog`. We need to also use `logs` and `updateLog`.
+Add a new column to the `active_sessions` table to store the tactical stopwatch start time.
 
-### Implementation Details
+```sql
+ALTER TABLE public.active_sessions
+ADD COLUMN tactical_start_time timestamp with time zone DEFAULT now();
+```
 
-**File: `src/components/ClockTab.tsx`**
+#### 2. Update `handle_new_user` Database Function
+
+Update the trigger function to initialize `tactical_start_time` when creating a new user's session.
+
+```sql
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  INSERT INTO public.titles (user_id, name, color)
+  VALUES (NEW.id, 'Idle', '#6B7280');
+  
+  INSERT INTO public.active_sessions (user_id, current_start_time, tactical_start_time)
+  VALUES (NEW.id, now(), now());
+  
+  RETURN NEW;
+END;
+$function$;
+```
+
+#### 3. Update `useActiveSession` Hook
+
+Add state and methods for the tactical stopwatch:
+
+- Fetch `tactical_start_time` from database on load
+- Add `tacticalStartTime` state
+- Add `resetTacticalTimer()` function to reset and persist
+- Update `resetSession()` to also reset tactical timer
+
+#### 4. Create `TacticalStopwatch` Component
+
+A lightweight display component that takes a `startTime` prop and shows elapsed time in smaller format.
+
+#### 5. Update `ClockTab.tsx`
+
+- Import and render `TacticalStopwatch` above the main stopwatch
+- Add a round reset button next to it
+- Wire up the reset handler
+
+### Files to Create/Modify
+
+| File | Action | Description |
+|------|--------|-------------|
+| Database migration | Create | Add `tactical_start_time` column to `active_sessions` |
+| `src/components/TacticalStopwatch.tsx` | Create | Display component for secondary timer |
+| `src/hooks/useActiveSession.ts` | Modify | Add tactical timer state, fetch, and reset methods |
+| `src/components/ClockTab.tsx` | Modify | Render tactical stopwatch with reset button |
+
+### Hook Changes Detail
 
 ```typescript
-// Current usage (line 58):
-const { createLog } = useLogs();
+// New state
+const [tacticalStartTime, setTacticalStartTime] = useState<Date | null>(null);
 
-// Updated usage:
-const { logs, createLog, updateLog } = useLogs();
+// Fetch includes tactical_start_time
+.select('current_start_time, current_title, current_comment, tactical_start_time')
+
+// New reset function
+const resetTacticalTimer = useCallback(async () => {
+  const newTime = new Date();
+  setTacticalStartTime(newTime);
+  if (!user) return;
+  
+  await supabase
+    .from('active_sessions')
+    .update({ tactical_start_time: newTime.toISOString() })
+    .eq('user_id', user.id);
+}, [user]);
+
+// resetSession also resets tactical
+.update({ 
+  current_start_time: newStartTime.toISOString(),
+  current_title: 'Idle',
+  current_comment: null,
+  tactical_start_time: newStartTime.toISOString()
+})
 ```
-
-**Updated `handleSaveStartTime` function:**
-
-```typescript
-const handleSaveStartTime = async () => {
-  if (!startTime || !editingStartTimeStr) return;
-  
-  const [hours, minutes] = editingStartTimeStr.split(':').map(Number);
-  const newStartTime = new Date(startTime);
-  newStartTime.setHours(hours, minutes, 0, 0);
-  
-  if (newStartTime > new Date()) {
-    toast.error('Start time cannot be in the future');
-    return;
-  }
-  
-  // Find the most recent log (logs are ordered by start_time descending)
-  const lastLog = logs[0];
-  
-  if (lastLog) {
-    const lastLogStart = new Date(lastLog.start_time);
-    
-    // Only update if the new start time is after the log's start time
-    if (newStartTime > lastLogStart) {
-      // Calculate new duration: difference between log start and new session start
-      const newDuration = Math.floor((newStartTime.getTime() - lastLogStart.getTime()) / 1000);
-      
-      await updateLog(lastLog.id, { duration: newDuration });
-    }
-  }
-  
-  await updateStartTime(newStartTime);
-  setIsStartTimeDialogOpen(false);
-  toast.success('Start time updated');
-};
-```
-
-### Edge Cases Handled
-
-| Scenario | Behavior |
-|----------|----------|
-| No previous logs exist | Only update session start time |
-| New start time is before the last log's start time | Only update session start time (don't create negative duration) |
-| New start time is after the last log's end time | Extend the last log's duration to meet the new start time |
-| New start time is before the last log's end time | Shrink the last log's duration |
-
-### Files Modified
-
-| File | Change |
-|------|--------|
-| `src/components/ClockTab.tsx` | Update `handleSaveStartTime` to also adjust the previous log's duration |
 
