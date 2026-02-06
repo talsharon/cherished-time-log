@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export function useActiveSession() {
   const { user } = useAuth();
   const [startTime, setStartTime] = useState<Date | null>(null);
+  const [tacticalStartTime, setTacticalStartTime] = useState<Date | null>(null);
   const [currentTitle, setCurrentTitle] = useState('Idle');
   const [currentComment, setCurrentComment] = useState('');
   const [loading, setLoading] = useState(true);
@@ -20,7 +21,7 @@ export function useActiveSession() {
 
     const { data, error } = await supabase
       .from('active_sessions')
-      .select('current_start_time, current_title, current_comment')
+      .select('current_start_time, current_title, current_comment, tactical_start_time')
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -28,6 +29,7 @@ export function useActiveSession() {
       console.error('Error fetching active session:', error);
     } else if (data) {
       setStartTime(new Date(data.current_start_time));
+      setTacticalStartTime(data.tactical_start_time ? new Date(data.tactical_start_time) : new Date(data.current_start_time));
       setCurrentTitle(data.current_title || 'Idle');
       setCurrentComment(data.current_comment || '');
     }
@@ -68,7 +70,8 @@ export function useActiveSession() {
       .update({ 
         current_start_time: newStartTime.toISOString(),
         current_title: 'Idle',
-        current_comment: null 
+        current_comment: null,
+        tactical_start_time: newStartTime.toISOString()
       })
       .eq('user_id', user.id);
 
@@ -78,9 +81,21 @@ export function useActiveSession() {
     }
 
     setStartTime(newStartTime);
+    setTacticalStartTime(newStartTime);
     setCurrentTitle('Idle');
     setCurrentComment('');
     return newStartTime;
+  }, [user]);
+
+  const resetTacticalTimer = useCallback(async () => {
+    const newTime = new Date();
+    setTacticalStartTime(newTime);
+    if (!user) return;
+
+    await supabase
+      .from('active_sessions')
+      .update({ tactical_start_time: newTime.toISOString() })
+      .eq('user_id', user.id);
   }, [user]);
 
   const updateStartTime = useCallback(async (newStartTime: Date) => {
@@ -95,10 +110,12 @@ export function useActiveSession() {
 
   return { 
     startTime, 
+    tacticalStartTime,
     currentTitle,
     currentComment,
     loading, 
     resetSession, 
+    resetTacticalTimer,
     updateTitle,
     updateComment,
     updateStartTime,
