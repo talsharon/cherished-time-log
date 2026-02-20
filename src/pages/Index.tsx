@@ -5,11 +5,14 @@ import { ClockTab } from '@/components/ClockTab';
 import { LogsTab } from '@/components/LogsTab';
 import { InsightsTab } from '@/components/InsightsTab';
 import { Button } from '@/components/ui/button';
-import { Clock, List, LogOut, Lightbulb } from 'lucide-react';
+import { Clock, List, LogOut, Lightbulb, Bell, BellOff } from 'lucide-react';
 import { TitlesProvider } from '@/contexts/TitlesContext';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function Index() {
   const { user, loading, signOut } = useAuth();
+  const { permission, isSupported, subscribe } = usePushNotifications();
 
   if (loading) {
     return (
@@ -29,14 +32,41 @@ export default function Index() {
         {/* Header */}
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
           <h1 className="text-lg font-semibold text-foreground">Time Tracker</h1>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={signOut}
-            className="h-9 w-9 text-muted-foreground"
-          >
-            <LogOut className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            {isSupported && permission !== "granted" && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={subscribe}
+                      className="h-9 w-9 text-muted-foreground"
+                    >
+                      {permission === "denied" ? (
+                        <BellOff className="h-5 w-5" />
+                      ) : (
+                        <Bell className="h-5 w-5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {permission === "denied"
+                      ? "Notifications blocked — enable in browser settings"
+                      : "Enable push notifications"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={signOut}
+              className="h-9 w-9 text-muted-foreground"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
         </header>
 
         {/* Main Content with Tabs */}
