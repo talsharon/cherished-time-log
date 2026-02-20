@@ -1,50 +1,122 @@
 
-## Increase Tactical Stopwatch and Reset Button Size
+## Fix Weekly AI Insights: Scheduling + Date Range Logic
 
-### Current Sizing
+### Problems Found
 
-- **TacticalStopwatch text**: `text-2xl` (approximately 24px)
-- **Reset button**: `h-8 w-8` (32x32 pixels) with `h-4 w-4` icon (16x16 pixels)
+**Problem 1: No cron job exists**
+The `pg_cron` extension is not enabled on this project, so there was never any scheduled weekly run. The function only worked when manually triggered from the button.
 
-### Proposed Changes
+**Problem 2: Wrong week date range**
+The current code calculates "this week" as Sunday-to-Saturday around *today*. When called on Saturday (trigger day), this means the analysis covers the current partial week, not the completed past week. It should always look at the **previous completed week** (last Sunday to last Saturday).
 
-#### 1. Increase TacticalStopwatch Font Size
+**Problem 3: No separation in the prompt between "this week" and "history"**
+All 500 logs are sent in one flat list. The AI doesn't have a clear boundary showing which logs are from the analyzed week and which are historical context. The requirement is to analyze the past week and compare it with previous data.
 
-Change the text size from `text-2xl` to `text-4xl` in `src/components/TacticalStopwatch.tsx`:
-- Current: `className="font-mono text-2xl font-light..."`
-- Updated: `className="font-mono text-4xl font-light..."`
+---
 
-This will increase the tactical stopwatch display to approximately 36px, making it more prominent and easier to read.
+### Solution
 
-#### 2. Increase Reset Button Size
+#### 1. Enable `pg_cron` + Schedule for Saturday 9:30 AM Israel Time (UTC+2/+3)
 
-Update the button dimensions and icon size in `src/components/ClockTab.tsx` (lines 215-223):
-- Button size: Change from `h-8 w-8` to `h-10 w-10` (40x40 pixels)
-- Icon size: Change from `h-4 w-4` to `h-5 w-5` (20x20 pixels)
+Israel Standard Time (IST) is UTC+2 in winter and UTC+3 in summer (DST). To safely target 9:30 AM IST year-round, we'll use UTC 7:30 (which is 9:30 IST in winter/UTC+2) and note this may be 10:30 in summer. A robust approach is to schedule at **06:30 UTC** to accommodate both IST (UTC+2, so 8:30 AM) and IDT (UTC+3, so 9:30 AM):
 
-This makes the button more touch-friendly and visually balanced with the larger text.
+Actually the simplest approach: Saturday 9:30 AM Israel Time. IST = UTC+2, IDT = UTC+3.
+- In winter (IST): 9:30 AM = 07:30 UTC  
+- In summer (IDT): 9:30 AM = 06:30 UTC  
 
-#### 3. Adjust Container Spacing (Optional)
+We'll pick **07:30 UTC Saturday** — this hits 9:30 AM in winter and 10:30 AM in summer. Alternatively, we can pick **06:30 UTC** to hit 8:30 AM in winter and 9:30 AM in summer. Given DST is active for most of the year in Israel, we'll use **06:30 UTC on Saturdays**, which gives 9:30 AM IDT (summer) and 8:30 AM IST (winter). This is the closest fixed UTC equivalent.
 
-The gap between the stopwatch and button is already `gap-3`, which should work fine with the larger sizes. The `mb-4` bottom margin can remain as is.
+Cron expression: `30 6 * * 6` (06:30 UTC every Saturday)
+
+The cron job will call all users' `generate-insights` function. Since the current function is user-scoped (requires an auth token), the cron approach requires iterating over users using the service role.
+
+**Architecture for scheduled runs:**
+- The cron job calls a backend function (using `pg_net` + `net.http_post`) with the service role key
+- The edge function detects when called without a user token (system call) and processes all users
+- When called with a user token (manual button), it processes only that user — existing behavior preserved
+
+#### 2. Fix Week Date Logic
+
+The "analyzed week" should always be the **last completed week**: the Sunday-to-Saturday period that ended before today.
+
+```typescript
+// Always analyze the PREVIOUS completed week (Sunday to Saturday)
+const now = new Date();
+// "now" in Israel time context — the function runs Saturday morning
+// The previous week ended last Saturday
+const dayOfWeek = now.getDay(); // Saturday = 6
+// Go back to last Sunday (start of the week being analyzed)
+const daysToLastSunday = dayOfWeek + 1; // +1 more day back to get to LAST Sunday, not this Sunday
+const weekStart = new Date(now);
+weekStart.setDate(now.getDate() - daysToLastSunday);
+weekStart.setUTCHours(0, 0, 0, 0);
+
+const weekEnd = new Date(weekStart);
+weekEnd.setDate(weekStart.getDate() + 6);
+weekEnd.setUTCHours(23, 59, 59, 999);
+```
+
+#### 3. Fix Prompt: Separate "This Week" vs "Historical" Logs
+
+Fetch logs in two separate queries:
+- **This week's logs**: filtered by `start_time` between `weekStart` and `weekEnd`
+- **Historical logs**: the previous 500 logs *excluding* this week
+
+Pass them separately to the prompt with clear labels so the AI can compare the current week against history.
+
+```typescript
+// Week logs — what we're analyzing
+const { data: weekLogs } = await supabase
+  .from("logs")
+  .select("title, comment, start_time, duration")
+  .eq("user_id", userId)
+  .gte("start_time", weekStart.toISOString())
+  .lte("start_time", weekEnd.toISOString())
+  .order("start_time", { ascending: true });
+
+// Historical logs — for comparison (up to 500, before this week)
+const { data: historicalLogs } = await supabase
+  .from("logs")
+  .select("title, comment, start_time, duration")
+  .eq("user_id", userId)
+  .lt("start_time", weekStart.toISOString())
+  .order("start_time", { ascending: false })
+  .limit(500);
+```
+
+The prompt will then present them in two clearly labeled sections.
+
+---
 
 ### Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/components/TacticalStopwatch.tsx` | Change `text-2xl` to `text-4xl` |
-| `src/components/ClockTab.tsx` | Change button from `h-8 w-8` to `h-10 w-10` and icon from `h-4 w-4` to `h-5 w-5` |
+| What | Description |
+|------|-------------|
+| Database (migration) | Enable `pg_cron` + `pg_net` extensions |
+| Database (insert, not migration) | Create cron job scheduled for Saturday 06:30 UTC |
+| `supabase/functions/generate-insights/index.ts` | Fix week date range, split logs into week vs history, add system-call mode for all users |
 
-### Visual Impact
+---
 
-```text
-Before:
-┌──────────────────────────┐
-│  00:05:23  [⟲]          │  ← Smaller, less prominent
-└──────────────────────────┘
+### Cron Job (System Call Mode)
 
-After:
-┌──────────────────────────┐
-│   00:05:23   [⟲]        │  ← Larger, more prominent
-└──────────────────────────┘
+The cron will POST to the edge function with the service role key (no user token). The edge function will detect this and loop through all users, generating insights for each:
+
+```typescript
+// Detect system call vs user call
+const isSystemCall = authHeader === `Bearer ${supabaseServiceKey}`;
+
+if (isSystemCall) {
+  // Fetch all users from active_sessions and process each
+  const { data: users } = await adminClient.from('active_sessions').select('user_id');
+  for (const { user_id } of users) {
+    await processUserInsights(adminClient, user_id, weekStart, weekEnd);
+  }
+} else {
+  // Normal user call — extract user from JWT
+  const { data: { user } } = await supabase.auth.getUser(token);
+  await processUserInsights(supabase, user.id, weekStart, weekEnd);
+}
 ```
+
+This keeps the manual button working exactly as before while enabling automated weekly runs for all users.
