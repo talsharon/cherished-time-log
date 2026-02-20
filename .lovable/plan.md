@@ -1,122 +1,187 @@
 
-## Fix Weekly AI Insights: Scheduling + Date Range Logic
+## Push Notifications for Weekly Insights
 
-### Problems Found
+### What needs to be built
 
-**Problem 1: No cron job exists**
-The `pg_cron` extension is not enabled on this project, so there was never any scheduled weekly run. The function only worked when manually triggered from the button.
+When the weekly insights are generated (both automatically via cron and manually via the sparkle button), the user receives a push notification: **"Your weekly insights are ready"**.
 
-**Problem 2: Wrong week date range**
-The current code calculates "this week" as Sunday-to-Saturday around *today*. When called on Saturday (trigger day), this means the analysis covers the current partial week, not the completed past week. It should always look at the **previous completed week** (last Sunday to last Saturday).
+This requires building a complete Web Push pipeline:
 
-**Problem 3: No separation in the prompt between "this week" and "history"**
-All 500 logs are sent in one flat list. The AI doesn't have a clear boundary showing which logs are from the analyzed week and which are historical context. The requirement is to analyze the past week and compare it with previous data.
+1. **VAPID key pair** — cryptographic keys required by the Web Push protocol for authentication
+2. **Push subscription storage** — save each user's browser push subscription in the database
+3. **Service worker** — receives and displays push notifications (the PWA already has one via vite-plugin-pwa, but we need to add push event handling)
+4. **Frontend subscription flow** — request permission and register the push subscription when the user is authenticated
+5. **Backend function** — a new edge function `send-push-notification` that sends push messages using the VAPID keys
+6. **Wire it into `generate-insights`** — after saving the weekly insight, call the push function for that user
 
 ---
 
-### Solution
+### Architecture Overview
 
-#### 1. Enable `pg_cron` + Schedule for Saturday 9:30 AM Israel Time (UTC+2/+3)
+```text
+User's browser (PWA)
+  └─ Service Worker (push listener)
+       └─ Displays notification when push event arrives
 
-Israel Standard Time (IST) is UTC+2 in winter and UTC+3 in summer (DST). To safely target 9:30 AM IST year-round, we'll use UTC 7:30 (which is 9:30 IST in winter/UTC+2) and note this may be 10:30 in summer. A robust approach is to schedule at **06:30 UTC** to accommodate both IST (UTC+2, so 8:30 AM) and IDT (UTC+3, so 9:30 AM):
+Frontend App
+  └─ On login: request push permission → subscribe → save to DB
 
-Actually the simplest approach: Saturday 9:30 AM Israel Time. IST = UTC+2, IDT = UTC+3.
-- In winter (IST): 9:30 AM = 07:30 UTC  
-- In summer (IDT): 9:30 AM = 06:30 UTC  
+generate-insights edge function (existing)
+  └─ After saving insight → calls send-push-notification
 
-We'll pick **07:30 UTC Saturday** — this hits 9:30 AM in winter and 10:30 AM in summer. Alternatively, we can pick **06:30 UTC** to hit 8:30 AM in winter and 9:30 AM in summer. Given DST is active for most of the year in Israel, we'll use **06:30 UTC on Saturdays**, which gives 9:30 AM IDT (summer) and 8:30 AM IST (winter). This is the closest fixed UTC equivalent.
-
-Cron expression: `30 6 * * 6` (06:30 UTC every Saturday)
-
-The cron job will call all users' `generate-insights` function. Since the current function is user-scoped (requires an auth token), the cron approach requires iterating over users using the service role.
-
-**Architecture for scheduled runs:**
-- The cron job calls a backend function (using `pg_net` + `net.http_post`) with the service role key
-- The edge function detects when called without a user token (system call) and processes all users
-- When called with a user token (manual button), it processes only that user — existing behavior preserved
-
-#### 2. Fix Week Date Logic
-
-The "analyzed week" should always be the **last completed week**: the Sunday-to-Saturday period that ended before today.
-
-```typescript
-// Always analyze the PREVIOUS completed week (Sunday to Saturday)
-const now = new Date();
-// "now" in Israel time context — the function runs Saturday morning
-// The previous week ended last Saturday
-const dayOfWeek = now.getDay(); // Saturday = 6
-// Go back to last Sunday (start of the week being analyzed)
-const daysToLastSunday = dayOfWeek + 1; // +1 more day back to get to LAST Sunday, not this Sunday
-const weekStart = new Date(now);
-weekStart.setDate(now.getDate() - daysToLastSunday);
-weekStart.setUTCHours(0, 0, 0, 0);
-
-const weekEnd = new Date(weekStart);
-weekEnd.setDate(weekStart.getDate() + 6);
-weekEnd.setUTCHours(23, 59, 59, 999);
+send-push-notification edge function (new)
+  └─ Loads VAPID keys from secrets
+  └─ Fetches user's push subscription from DB
+  └─ Sends Web Push message via web-push protocol
 ```
 
-#### 3. Fix Prompt: Separate "This Week" vs "Historical" Logs
+---
 
-Fetch logs in two separate queries:
-- **This week's logs**: filtered by `start_time` between `weekStart` and `weekEnd`
-- **Historical logs**: the previous 500 logs *excluding* this week
+### Step 1: VAPID Keys (Secrets)
 
-Pass them separately to the prompt with clear labels so the AI can compare the current week against history.
+VAPID (Voluntary Application Server Identification) keys are needed to authenticate your push server with browser push services. Two secrets will be added:
+- `VAPID_PUBLIC_KEY` — shared with the browser
+- `VAPID_PRIVATE_KEY` — kept secret on the server
 
-```typescript
-// Week logs — what we're analyzing
-const { data: weekLogs } = await supabase
-  .from("logs")
-  .select("title, comment, start_time, duration")
-  .eq("user_id", userId)
-  .gte("start_time", weekStart.toISOString())
-  .lte("start_time", weekEnd.toISOString())
-  .order("start_time", { ascending: true });
+We'll generate them using the standard `web-push` library format and store them as secrets.
 
-// Historical logs — for comparison (up to 500, before this week)
-const { data: historicalLogs } = await supabase
-  .from("logs")
-  .select("title, comment, start_time, duration")
-  .eq("user_id", userId)
-  .lt("start_time", weekStart.toISOString())
-  .order("start_time", { ascending: false })
-  .limit(500);
+---
+
+### Step 2: Database — `push_subscriptions` table
+
+A new table to store each user's push subscription object (which contains the browser's push endpoint URL + encryption keys):
+
+```sql
+CREATE TABLE public.push_subscriptions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id text NOT NULL UNIQUE,
+  subscription jsonb NOT NULL,  -- the full PushSubscription JSON
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- RLS: users can only read/write their own subscription
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users manage own subscription" ON public.push_subscriptions
+  FOR ALL USING (user_id = auth.uid()::text);
 ```
 
-The prompt will then present them in two clearly labeled sections.
+Using `UNIQUE` on `user_id` means one subscription per user (upserted on each login/refresh).
 
 ---
 
-### Files to Modify
+### Step 3: New Edge Function — `send-push-notification`
 
-| What | Description |
-|------|-------------|
-| Database (migration) | Enable `pg_cron` + `pg_net` extensions |
-| Database (insert, not migration) | Create cron job scheduled for Saturday 06:30 UTC |
-| `supabase/functions/generate-insights/index.ts` | Fix week date range, split logs into week vs history, add system-call mode for all users |
+This function:
+1. Receives `{ user_id, title, body }` in the request body
+2. Loads VAPID keys from environment secrets
+3. Fetches the user's push subscription from the `push_subscriptions` table
+4. Sends the Web Push message using the Web Push protocol (RFC 8030)
 
----
+Since Deno doesn't have a native `web-push` library, we'll implement the VAPID signing manually using the Web Crypto API (available in Deno). This avoids adding npm dependencies to the edge function.
 
-### Cron Job (System Call Mode)
-
-The cron will POST to the edge function with the service role key (no user token). The edge function will detect this and loop through all users, generating insights for each:
-
-```typescript
-// Detect system call vs user call
-const isSystemCall = authHeader === `Bearer ${supabaseServiceKey}`;
-
-if (isSystemCall) {
-  // Fetch all users from active_sessions and process each
-  const { data: users } = await adminClient.from('active_sessions').select('user_id');
-  for (const { user_id } of users) {
-    await processUserInsights(adminClient, user_id, weekStart, weekEnd);
-  }
-} else {
-  // Normal user call — extract user from JWT
-  const { data: { user } } = await supabase.auth.getUser(token);
-  await processUserInsights(supabase, user.id, weekStart, weekEnd);
+The payload sent to the browser will be:
+```json
+{
+  "title": "Time Tracker",
+  "body": "Your weekly insights are ready! 📊",
+  "icon": "/pwa-192x192.png",
+  "badge": "/pwa-192x192.png",
+  "tag": "weekly-insights",
+  "url": "/"
 }
 ```
 
-This keeps the manual button working exactly as before while enabling automated weekly runs for all users.
+---
+
+### Step 4: Wire into `generate-insights`
+
+After the `adminClient.from("weekly_insights").upsert(...)` succeeds inside `processUserInsights`, call the `send-push-notification` function for that user:
+
+```typescript
+// After successful insight save
+await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${supabaseServiceKey}`,
+  },
+  body: JSON.stringify({
+    user_id: userId,
+    title: 'Time Tracker',
+    body: 'Your weekly insights are ready! 📊',
+  }),
+});
+```
+
+---
+
+### Step 5: Frontend — Subscribe to Push Notifications
+
+A new hook `usePushNotifications` that:
+1. After user authentication, checks if push is supported
+2. Gets the current `Notification.permission` state
+3. On first load (or when permission is `default`), prompts the user to allow notifications
+4. If granted, calls `pushManager.subscribe()` with the VAPID public key
+5. Saves the subscription to the `push_subscriptions` table via the Supabase client
+
+The hook is called in `src/pages/Index.tsx` (the authenticated main page) so it runs once the user is logged in.
+
+A small UI element: a discreet "Enable notifications" button shown in the header (only if permission is `default` or `denied`), so the user can trigger it manually if they dismiss the auto-prompt.
+
+---
+
+### Step 6: Service Worker — Handle Push Events
+
+The vite-plugin-pwa generates a service worker automatically. We need to add a **custom service worker** that extends the generated one with push event handling.
+
+In `vite.config.ts`, we switch from `generateSW` (auto-generate) to `injectManifest` mode, which lets us write our own `src/sw.ts` that includes both workbox caching and push notification handling:
+
+```typescript
+// src/sw.ts
+import { precacheAndRoute } from 'workbox-precaching';
+
+precacheAndRoute(self.__WB_MANIFEST);
+
+self.addEventListener('push', (event) => {
+  const data = event.data?.json() ?? {};
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Time Tracker', {
+      body: data.body || 'Your weekly insights are ready!',
+      icon: data.icon || '/pwa-192x192.png',
+      badge: data.badge || '/pwa-192x192.png',
+      tag: data.tag || 'weekly-insights',
+      data: { url: data.url || '/' },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(clients.openWindow(event.notification.data?.url || '/'));
+});
+```
+
+---
+
+### Files to Create/Modify
+
+| File | Action | Description |
+|------|--------|-------------|
+| Database migration | Create | `push_subscriptions` table with RLS |
+| `supabase/functions/send-push-notification/index.ts` | Create | New edge function for Web Push |
+| `supabase/functions/generate-insights/index.ts` | Modify | Call push notification after saving insight |
+| `src/sw.ts` | Create | Custom service worker with push event handling |
+| `vite.config.ts` | Modify | Switch to `injectManifest` mode, add custom SW |
+| `src/hooks/usePushNotifications.ts` | Create | Hook to subscribe to push and save to DB |
+| `src/pages/Index.tsx` | Modify | Call `usePushNotifications` hook |
+
+---
+
+### Technical Notes
+
+- **VAPID key generation**: The `VAPID_PUBLIC_KEY` must be in uncompressed EC point format (base64url-encoded, 65 bytes). We'll generate a key pair using an online VAPID key generator (the standard approach), then store both keys as secrets.
+- **`injectManifest` vs `generateSW`**: Switching modes gives us full control over the service worker while still using Workbox for precaching. The existing caching rules from `vite.config.ts` will be migrated to the custom SW file.
+- **Subscription update**: Each time the user loads the app, if they already granted permission, we re-subscribe and upsert. This handles cases where the browser rotates the push subscription.
+- **Graceful degradation**: If push is not supported (some browsers, especially iOS Safari before 16.4) or permission is denied, the app continues to work normally — insights still generate, just without the notification.
+- **iOS PWA**: Push notifications work on iOS 16.4+ when the app is added to the home screen as a PWA. A banner prompting "Add to Home Screen" is shown to iOS users to improve the experience.
