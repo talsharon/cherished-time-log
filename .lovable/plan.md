@@ -1,88 +1,47 @@
 
 
-## Fix: Week Range to Saturday-Friday (Inclusive)
+## Fix: Push Notifications Not Firing
 
-### What Changes
+### Root Cause
 
-The week range for analysis will be **previous Saturday 00:00 UTC** through **Friday 23:59:59 UTC** (the day before the cron runs). This ensures all activities are captured since the cron fires Saturday 06:30 UTC, well after Friday ends.
+The `send-push-notification` edge function has **never executed** -- zero logs ever recorded. This is because:
 
-```text
-Sat 00:00 -------- Fri 23:59:59  |  Sat 06:30
-|<----- full week analyzed ----->|  ^ cron runs here
-```
+1. The function is NOT listed in `supabase/config.toml` with `verify_jwt = false`
+2. Supabase's default behavior (`verify_jwt = true`) rejects the incoming request at the infrastructure level, **before the function code runs**
+3. The `generate-insights` function calls `send-push-notification` with a service role key, but the JWT verification at the gateway level blocks it
+4. The error is silently caught in the `try/catch` block (lines 276-291 of generate-insights), so insights save successfully but notifications never send
 
-The cron job stays on Saturday at 06:30 UTC -- no schedule change needed.
+### Fix
 
-### Technical Details
+Add both edge functions to `supabase/config.toml` with `verify_jwt = false`. Both functions already implement their own authorization checks in code:
 
-**File: `supabase/functions/generate-insights/index.ts`**
-
-Replace `getPreviousWeekRange()` with:
-
-```typescript
-function getPreviousWeekRange(): { weekStart: Date; weekEnd: Date } {
-  const now = new Date();
-  const dayOfWeek = now.getUTCDay(); // Sunday = 0, Saturday = 6
-
-  // Calculate days back to the previous Saturday
-  // Saturday = 6, so: if today is Saturday (6), go back 7 days
-  // if today is Sunday (0), go back 1 day, Monday (1) go back 2, etc.
-  const daysBackToSaturday = dayOfWeek === 6 ? 7 : dayOfWeek + 1;
-
-  const weekStart = new Date(now);
-  weekStart.setUTCDate(now.getUTCDate() - daysBackToSaturday);
-  weekStart.setUTCHours(0, 0, 0, 0);
-
-  // Week ends on Friday (6 days after Saturday)
-  const weekEnd = new Date(weekStart);
-  weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
-  weekEnd.setUTCHours(23, 59, 59, 999);
-
-  return { weekStart, weekEnd };
-}
-```
-
-Day-of-week verification (when cron fires on Saturday):
-- `dayOfWeek = 6` (Saturday) -> `daysBackToSaturday = 7` -> lands on previous Saturday
-- `weekEnd = previous Saturday + 6 days = Friday 23:59:59`
-
-**Same file -- add pre-computed stats to `buildPrompt()`:**
-
-Before the raw logs JSON, inject a computed summary so the AI uses exact numbers:
-
-```typescript
-// Compute stats from weekLogs before building prompt
-const totalSeconds = weekLogs.reduce((sum, l) => sum + l.duration, 0);
-const totalHours = Math.floor(totalSeconds / 3600);
-const totalMinutes = Math.round((totalSeconds % 3600) / 60);
-
-const byTitle: Record<string, number> = {};
-for (const log of weekLogs) {
-  byTitle[log.title] = (byTitle[log.title] || 0) + log.duration;
-}
-const breakdown = Object.entries(byTitle)
-  .sort((a, b) => b[1] - a[1])
-  .map(([title, secs]) => `  - ${title}: ${(secs / 3600).toFixed(1)} hours (${((secs / totalSeconds) * 100).toFixed(1)}%)`)
-  .join('\n');
-
-const statsBlock = `
-COMPUTED STATS (use these exact numbers, do NOT re-calculate from raw logs):
-- Total tracked time: ${totalHours} hours ${totalMinutes} minutes
-- Activity count: ${weekLogs.length} entries
-- Breakdown by activity:
-${breakdown}
-`;
-```
-
-This block gets inserted into the prompt text right before the raw logs section.
-
-**Update prompt week label** to say "Saturday to Friday" instead of "Sunday to Saturday" so the AI's text matches the actual range.
+- `generate-insights`: checks for auth header and validates user token or service role key
+- `send-push-notification`: checks that auth header matches the service role key exactly
 
 ### Files to Modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/generate-insights/index.ts` | Fix `getPreviousWeekRange()` to Sat-Fri range; add pre-computed stats to prompt |
+| `supabase/config.toml` | Add `verify_jwt = false` for both `generate-insights` and `send-push-notification` |
 
-No cron job or database changes needed -- the schedule stays as-is on Saturday 06:30 UTC.
+### Technical Details
+
+**`supabase/config.toml`** -- add:
+
+```toml
+[functions.generate-insights]
+verify_jwt = false
+
+[functions.send-push-notification]
+verify_jwt = false
+```
+
+After this change, both functions will be redeployed automatically. The push notification flow will then work:
+
+1. `generate-insights` saves the insight
+2. Calls `send-push-notification` with the service role key
+3. The request reaches the function code (no longer blocked by gateway)
+4. The function validates the service role key, fetches the user's push subscription, encrypts the payload, and sends it to Apple's push service
+
+No code changes needed -- only the config file update.
 
