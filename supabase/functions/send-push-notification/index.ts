@@ -27,6 +27,7 @@ function bytesToBase64url(bytes: Uint8Array): string {
 async function buildVapidJWT(
   endpoint: string,
   privateKeyBase64: string,
+  publicKeyBase64: string,
   subject: string
 ): Promise<string> {
   const url = new URL(endpoint);
@@ -47,12 +48,20 @@ async function buildVapidJWT(
   );
   const signingInput = `${headerB64}.${payloadB64}`;
 
-  // Import private key (raw EC private key bytes, base64url encoded)
+  // Import private key via JWK (reliable, no manual DER encoding)
   const privateKeyBytes = base64urlToBytes(privateKeyBase64);
+  const publicKeyBytes = base64urlToBytes(publicKeyBase64);
+
+  // P-256 uncompressed public key: 0x04 || x (32 bytes) || y (32 bytes)
+  const x = bytesToBase64url(publicKeyBytes.slice(1, 33));
+  const y = bytesToBase64url(publicKeyBytes.slice(33, 65));
+  const d = bytesToBase64url(privateKeyBytes);
+
+  const jwk = { kty: "EC", crv: "P-256", x, y, d };
+
   const cryptoKey = await crypto.subtle.importKey(
-    "pkcs8",
-    // Convert raw P-256 private key scalar to PKCS8 format
-    toPkcs8(privateKeyBytes),
+    "jwk",
+    jwk,
     { name: "ECDSA", namedCurve: "P-256" },
     false,
     ["sign"]
@@ -67,27 +76,6 @@ async function buildVapidJWT(
   return `${signingInput}.${bytesToBase64url(new Uint8Array(signature))}`;
 }
 
-// Convert raw 32-byte EC private key to PKCS8 DER for Web Crypto API
-function toPkcs8(rawKey: Uint8Array): ArrayBuffer {
-  // PKCS8 wrapper for EC P-256 private key
-  // OID for ecPublicKey: 1.2.840.10045.2.1
-  // OID for P-256: 1.2.840.10045.3.1.7
-  const ecOid = new Uint8Array([
-    0x30, 0x41, // SEQUENCE
-    0x02, 0x01, 0x00, // INTEGER 0 (version)
-    0x30, 0x13, // SEQUENCE (algorithmIdentifier)
-    0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, // OID ecPublicKey
-    0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, // OID P-256
-    0x04, 0x27, // OCTET STRING (privateKey)
-    0x30, 0x25, // SEQUENCE (ECPrivateKey)
-    0x02, 0x01, 0x01, // INTEGER 1 (version)
-    0x04, 0x20, // OCTET STRING (32 bytes)
-  ]);
-  const combined = new Uint8Array(ecOid.length + rawKey.length);
-  combined.set(ecOid);
-  combined.set(rawKey, ecOid.length);
-  return combined.buffer;
-}
 
 // ─── RFC 8291 Web Push Encryption ───────────────────────────────────────────
 
@@ -280,7 +268,7 @@ serve(async (req) => {
     const notificationPayload = JSON.stringify({ title, body });
 
     // Build VAPID JWT
-    const jwt = await buildVapidJWT(endpoint, vapidPrivateKey, vapidSubject);
+    const jwt = await buildVapidJWT(endpoint, vapidPrivateKey, vapidPublicKey, vapidSubject);
 
     // Encrypt payload
     const { ciphertext, salt, serverPublicKey } = await encryptPayload(
