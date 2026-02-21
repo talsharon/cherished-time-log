@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SignJWT, importJWK } from "npm:jose@6";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,47 +34,20 @@ async function buildVapidJWT(
   const url = new URL(endpoint);
   const audience = `${url.protocol}//${url.host}`;
 
-  const header = { typ: "JWT", alg: "ES256" };
-  const payload = {
-    aud: audience,
-    exp: Math.floor(Date.now() / 1000) + 12 * 3600,
-    sub: subject,
-  };
-
-  const headerB64 = bytesToBase64url(
-    new TextEncoder().encode(JSON.stringify(header))
-  );
-  const payloadB64 = bytesToBase64url(
-    new TextEncoder().encode(JSON.stringify(payload))
-  );
-  const signingInput = `${headerB64}.${payloadB64}`;
-
-  // Import private key via JWK (reliable, no manual DER encoding)
   const privateKeyBytes = base64urlToBytes(privateKeyBase64);
   const publicKeyBytes = base64urlToBytes(publicKeyBase64);
 
-  // P-256 uncompressed public key: 0x04 || x (32 bytes) || y (32 bytes)
   const x = bytesToBase64url(publicKeyBytes.slice(1, 33));
   const y = bytesToBase64url(publicKeyBytes.slice(33, 65));
   const d = bytesToBase64url(privateKeyBytes);
 
   const jwk = { kty: "EC", crv: "P-256", x, y, d };
+  const key = await importJWK(jwk, "ES256");
 
-  const cryptoKey = await crypto.subtle.importKey(
-    "jwk",
-    jwk,
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign"]
-  );
-
-  const signature = await crypto.subtle.sign(
-    { name: "ECDSA", hash: "SHA-256" },
-    cryptoKey,
-    new TextEncoder().encode(signingInput)
-  );
-
-  return `${signingInput}.${bytesToBase64url(new Uint8Array(signature))}`;
+  return new SignJWT({ aud: audience, sub: subject })
+    .setProtectedHeader({ typ: "JWT", alg: "ES256" })
+    .setExpirationTime("12h")
+    .sign(key);
 }
 
 
