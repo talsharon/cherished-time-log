@@ -1,63 +1,88 @@
 
 
-## Fix: Cron Job Timeout for Weekly Insights
+## Fix: Week Range to Saturday-Friday (Inclusive)
 
-### Root Cause
+### What Changes
 
-The weekly cron job uses `net.http_post()` which has a **5-second default timeout**. The `generate-insights` function needs significantly more time because it:
-1. Fetches logs from the database
-2. Calls the AI gateway (which can take 10-30+ seconds)
-3. Saves the insight
-4. Triggers the push notification
+The week range for analysis will be **previous Saturday 00:00 UTC** through **Friday 23:59:59 UTC** (the day before the cron runs). This ensures all activities are captured since the cron fires Saturday 06:30 UTC, well after Friday ends.
 
-The DB log confirms the timeout:
-```
-Timeout of 5000 ms reached. Total time: 5001.203 ms
+```text
+Sat 00:00 -------- Fri 23:59:59  |  Sat 06:30
+|<----- full week analyzed ----->|  ^ cron runs here
 ```
 
-### Fix
+The cron job stays on Saturday at 06:30 UTC -- no schedule change needed.
 
-Update the cron job SQL to pass a longer timeout (e.g., 120 seconds) using the `timeout_milliseconds` parameter of `net.http_post()`:
+### Technical Details
 
-```sql
--- Drop the existing cron job
-SELECT cron.unschedule('weekly-insights-saturday');
+**File: `supabase/functions/generate-insights/index.ts`**
 
--- Re-create with a 120-second timeout
-SELECT cron.schedule(
-  'weekly-insights-saturday',
-  '30 6 * * 6',
-  $$
-  SELECT net.http_post(
-    url := 'https://zpjltjjqzkqwpufxceqq.supabase.co/functions/v1/generate-insights',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key')
-    ),
-    body := '{"system_call": true}'::jsonb,
-    timeout_milliseconds := 120000
-  ) AS request_id;
-  $$
-);
+Replace `getPreviousWeekRange()` with:
+
+```typescript
+function getPreviousWeekRange(): { weekStart: Date; weekEnd: Date } {
+  const now = new Date();
+  const dayOfWeek = now.getUTCDay(); // Sunday = 0, Saturday = 6
+
+  // Calculate days back to the previous Saturday
+  // Saturday = 6, so: if today is Saturday (6), go back 7 days
+  // if today is Sunday (0), go back 1 day, Monday (1) go back 2, etc.
+  const daysBackToSaturday = dayOfWeek === 6 ? 7 : dayOfWeek + 1;
+
+  const weekStart = new Date(now);
+  weekStart.setUTCDate(now.getUTCDate() - daysBackToSaturday);
+  weekStart.setUTCHours(0, 0, 0, 0);
+
+  // Week ends on Friday (6 days after Saturday)
+  const weekEnd = new Date(weekStart);
+  weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
+  weekEnd.setUTCHours(23, 59, 59, 999);
+
+  return { weekStart, weekEnd };
+}
 ```
 
-### What This Changes
+Day-of-week verification (when cron fires on Saturday):
+- `dayOfWeek = 6` (Saturday) -> `daysBackToSaturday = 7` -> lands on previous Saturday
+- `weekEnd = previous Saturday + 6 days = Friday 23:59:59`
 
-| Before | After |
-|--------|-------|
-| 5-second timeout (default) | 120-second timeout |
-| Function times out, no insight generated | Function has enough time to complete |
-| No push notification sent | Push notification fires after insight is saved |
+**Same file -- add pre-computed stats to `buildPrompt()`:**
 
-### Additional Step: Verify `send-push-notification` Deployment
+Before the raw logs JSON, inject a computed summary so the AI uses exact numbers:
 
-The `send-push-notification` edge function has zero logs, meaning it may have never been successfully deployed. After fixing the cron timeout, we should also deploy this function and test it to ensure push notifications work end-to-end.
+```typescript
+// Compute stats from weekLogs before building prompt
+const totalSeconds = weekLogs.reduce((sum, l) => sum + l.duration, 0);
+const totalHours = Math.floor(totalSeconds / 3600);
+const totalMinutes = Math.round((totalSeconds % 3600) / 60);
+
+const byTitle: Record<string, number> = {};
+for (const log of weekLogs) {
+  byTitle[log.title] = (byTitle[log.title] || 0) + log.duration;
+}
+const breakdown = Object.entries(byTitle)
+  .sort((a, b) => b[1] - a[1])
+  .map(([title, secs]) => `  - ${title}: ${(secs / 3600).toFixed(1)} hours (${((secs / totalSeconds) * 100).toFixed(1)}%)`)
+  .join('\n');
+
+const statsBlock = `
+COMPUTED STATS (use these exact numbers, do NOT re-calculate from raw logs):
+- Total tracked time: ${totalHours} hours ${totalMinutes} minutes
+- Activity count: ${weekLogs.length} entries
+- Breakdown by activity:
+${breakdown}
+`;
+```
+
+This block gets inserted into the prompt text right before the raw logs section.
+
+**Update prompt week label** to say "Saturday to Friday" instead of "Sunday to Saturday" so the AI's text matches the actual range.
 
 ### Files to Modify
 
-| File | Action | Description |
-|------|--------|-------------|
-| Database migration | Create | Drop and re-create cron job with 120s timeout |
+| File | Change |
+|------|--------|
+| `supabase/functions/generate-insights/index.ts` | Fix `getPreviousWeekRange()` to Sat-Fri range; add pre-computed stats to prompt |
 
-No code file changes are needed -- this is purely a database/cron configuration fix.
+No cron job or database changes needed -- the schedule stays as-is on Saturday 06:30 UTC.
 
