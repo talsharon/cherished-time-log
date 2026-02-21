@@ -191,7 +191,8 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY")!;
     const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY")!;
-    const vapidSubject = Deno.env.get("VAPID_SUBJECT")!;
+    // Sanitize VAPID_SUBJECT: strip whitespace and angle brackets
+    const vapidSubject = Deno.env.get("VAPID_SUBJECT")!.replace(/[<>]/g, "").replace(/\s+/g, "");
 
     // Only allow internal calls with service role key
     const authHeader = req.headers.get("Authorization");
@@ -243,29 +244,6 @@ serve(async (req) => {
 
     // Build VAPID JWT
     const jwt = await buildVapidJWT(endpoint, vapidPrivateKey, vapidPublicKey, vapidSubject);
-
-    // Debug logging
-    const pubKeyBytes = base64urlToBytes(vapidPublicKey);
-    const privKeyBytes = base64urlToBytes(vapidPrivateKey);
-    console.log("VAPID Debug:", JSON.stringify({
-      endpoint_origin: new URL(endpoint).origin,
-      subject: vapidSubject,
-      pub_key_length: pubKeyBytes.length,
-      pub_key_first_byte: pubKeyBytes[0],
-      priv_key_length: privKeyBytes.length,
-      k_param_preview: vapidPublicKey.substring(0, 10),
-      frontend_key_preview: "BApU5xo2mM",
-      jwt_parts: jwt.split(".").length,
-    }));
-
-    // Decode JWT payload to verify claims
-    try {
-      const payloadPart = jwt.split(".")[1];
-      const decoded = JSON.parse(atob(payloadPart.replace(/-/g, "+").replace(/_/g, "/")));
-      console.log("JWT claims:", JSON.stringify(decoded));
-    } catch (e) {
-      console.error("Failed to decode JWT:", e);
-    }
 
     // Encrypt payload
     const { ciphertext, salt, serverPublicKey } = await encryptPayload(
