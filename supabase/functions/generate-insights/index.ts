@@ -39,20 +39,22 @@ interface AnalysisResult {
   graphs: Graph[];
 }
 
-// Calculate the PREVIOUS completed week (Sunday to Saturday)
-// This ensures we always analyze a full, completed week
+// Calculate the PREVIOUS completed week (Saturday to Friday)
+// Cron runs Saturday 06:30 UTC, so Friday is fully complete
 function getPreviousWeekRange(): { weekStart: Date; weekEnd: Date } {
   const now = new Date();
   const dayOfWeek = now.getUTCDay(); // Sunday = 0, Saturday = 6
 
-  // Go back to last Sunday (start of the week being analyzed)
-  // e.g., if today is Saturday (6): go back 6+1 = 7 days to get LAST Sunday
-  // e.g., if today is Monday (1): go back 1+1 = 2 days to get LAST Sunday
-  const daysToLastSunday = dayOfWeek + 1;
+  // Calculate days back to the previous Saturday
+  // Saturday = 6: go back 7 days to previous Saturday
+  // Sunday = 0: go back 1 day, Monday = 1: go back 2, etc.
+  const daysBackToSaturday = dayOfWeek === 6 ? 7 : dayOfWeek + 1;
+
   const weekStart = new Date(now);
-  weekStart.setUTCDate(now.getUTCDate() - daysToLastSunday);
+  weekStart.setUTCDate(now.getUTCDate() - daysBackToSaturday);
   weekStart.setUTCHours(0, 0, 0, 0);
 
+  // Week ends on Friday (6 days after Saturday)
   const weekEnd = new Date(weekStart);
   weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
   weekEnd.setUTCHours(23, 59, 59, 999);
@@ -109,12 +111,35 @@ async function processUserInsights(
     .select("name, description")
     .eq("user_id", userId);
 
+  // Pre-compute stats so the AI doesn't need to sum raw logs
+  const totalSeconds = weekLogs.reduce((sum: number, l: any) => sum + l.duration, 0);
+  const totalHours = Math.floor(totalSeconds / 3600);
+  const totalMinutes = Math.round((totalSeconds % 3600) / 60);
+
+  const byTitle: Record<string, number> = {};
+  for (const log of weekLogs) {
+    byTitle[log.title] = (byTitle[log.title] || 0) + log.duration;
+  }
+  const breakdown = Object.entries(byTitle)
+    .sort((a, b) => b[1] - a[1])
+    .map(([title, secs]) => `  - ${title}: ${(secs / 3600).toFixed(1)} hours (${((secs / totalSeconds) * 100).toFixed(1)}%)`)
+    .join('\n');
+
+  const statsBlock = `
+COMPUTED STATS (use these exact numbers, do NOT re-calculate from raw logs):
+- Total tracked time: ${totalHours} hours ${totalMinutes} minutes
+- Activity count: ${weekLogs.length} entries
+- Breakdown by activity:
+${breakdown}
+`;
+
   const prompt = buildPrompt(
     weekLogs as LogEntry[],
     (historicalLogs || []) as LogEntry[],
     categories as Category[] || [],
     weekStartStr,
-    weekEndStr
+    weekEndStr,
+    statsBlock
   );
 
   // Call Lovable AI
@@ -392,7 +417,8 @@ function buildPrompt(
   historicalLogs: LogEntry[],
   categories: Category[],
   weekStart: string,
-  weekEnd: string
+  weekEnd: string,
+  statsBlock: string
 ): string {
   const weekLogsJson = JSON.stringify(
     weekLogs.map((l) => ({
@@ -430,14 +456,16 @@ IMPORTANT: Write ALL text responses (summary, insights, recommendations) in HEBR
 Category names should remain in ENGLISH for consistency.
 Graph titles should be in HEBREW.
 
-WEEK BEING ANALYZED: ${weekStart} (Sunday) to ${weekEnd} (Saturday)
+WEEK BEING ANALYZED: ${weekStart} (Saturday) to ${weekEnd} (Friday)
+
+${statsBlock}
 
 EXISTING CATEGORIES (use these when possible, only create new ones if truly needed):
 ${categoriesJson}
 
 ---
 
-## THIS WEEK'S LOGS (the period being analyzed — ${weekStart} to ${weekEnd}):
+## THIS WEEK'S RAW LOGS (the period being analyzed — ${weekStart} to ${weekEnd}):
 Format: { title, comment, start_time (ISO), duration_seconds }
 ${weekLogsJson}
 
