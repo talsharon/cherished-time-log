@@ -1,66 +1,63 @@
 
-## Implementation Plan: Web Push Notifications with Your VAPID Keys
 
-### What I'll do
+## Fix: Cron Job Timeout for Weekly Insights
 
-1. Store your VAPID keys as secure secrets (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`)
-2. Create the `send-push-notification` edge function
-3. Update `generate-insights` to call it after saving insights
-4. Create a custom service worker (`src/sw.ts`) that handles push events
-5. Switch `vite.config.ts` to `injectManifest` mode so our custom SW is used
-6. Create the `usePushNotifications` hook that requests permission and saves the subscription
-7. Wire the hook into `Index.tsx` with a discreet "Enable notifications" button in the header
+### Root Cause
 
----
+The weekly cron job uses `net.http_post()` which has a **5-second default timeout**. The `generate-insights` function needs significantly more time because it:
+1. Fetches logs from the database
+2. Calls the AI gateway (which can take 10-30+ seconds)
+3. Saves the insight
+4. Triggers the push notification
 
-### Step-by-step breakdown
+The DB log confirms the timeout:
+```
+Timeout of 5000 ms reached. Total time: 5001.203 ms
+```
 
-**Secrets (stored securely in Lovable Cloud):**
-- `VAPID_PUBLIC_KEY` = `BApU5xo2mMuYFAqTWGNbE5hHBwCY_ON0V4pujGuWD4FSoNWGa1qjxKqSx3vOAxnbKPzyXsUIVEW4prO_YgMJc_M`
-- `VAPID_PRIVATE_KEY` = `IfDUSvZ5d5-ccraLYlrOMttX-r-hofYgzCwjbMXYRHg`
-- `VAPID_SUBJECT` = `mailto:talsharonts@gmail.com`
+### Fix
 
-**New edge function — `send-push-notification`:**
-- Accepts `{ user_id, title, body }` in the request body (called internally by `generate-insights` using the service role key)
-- Fetches the user's push subscription from the `push_subscriptions` table
-- Signs the request with the VAPID keys using the Web Crypto API (no external dependencies)
-- Sends the encrypted Web Push message to the browser's push endpoint
+Update the cron job SQL to pass a longer timeout (e.g., 120 seconds) using the `timeout_milliseconds` parameter of `net.http_post()`:
 
-**Updated `generate-insights`:**
-- After the successful `weekly_insights` upsert, calls `send-push-notification` with:
-  - `title`: `"Time Tracker"`
-  - `body`: `"Your weekly insights are ready! 📊"`
+```sql
+-- Drop the existing cron job
+SELECT cron.unschedule('weekly-insights-saturday');
 
-**Custom service worker (`src/sw.ts`):**
-- Imports the Workbox precache manifest (`self.__WB_MANIFEST`) — same caching as before
-- Adds a `push` event listener that calls `showNotification()` with the payload
-- Adds a `notificationclick` listener that opens the app when the user taps the notification
+-- Re-create with a 120-second timeout
+SELECT cron.schedule(
+  'weekly-insights-saturday',
+  '30 6 * * 6',
+  $$
+  SELECT net.http_post(
+    url := 'https://zpjltjjqzkqwpufxceqq.supabase.co/functions/v1/generate-insights',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key')
+    ),
+    body := '{"system_call": true}'::jsonb,
+    timeout_milliseconds := 120000
+  ) AS request_id;
+  $$
+);
+```
 
-**`vite.config.ts` update:**
-- Switches from `generateSW` (default) to `injectManifest` strategy
-- Points `srcDir` to `src` and `filename` to `sw.ts` — Workbox injects the precache manifest into our custom SW at build time
-- All existing runtime caching rules are moved into `src/sw.ts` using Workbox's `registerRoute`
+### What This Changes
 
-**New hook — `src/hooks/usePushNotifications.ts`:**
-- Checks if `PushManager` is supported in this browser
-- If permission is `granted`, re-subscribes and upserts to `push_subscriptions` (handles subscription rotation)
-- Exposes `{ permission, subscribe }` so the UI can show an "Enable notifications" button
-- The `subscribe()` function calls `pushManager.subscribe()` with the VAPID public key and saves the result to the database
+| Before | After |
+|--------|-------|
+| 5-second timeout (default) | 120-second timeout |
+| Function times out, no insight generated | Function has enough time to complete |
+| No push notification sent | Push notification fires after insight is saved |
 
-**`Index.tsx` changes:**
-- Calls `usePushNotifications()` at the top
-- Adds a `Bell` icon button next to the logout button in the header — only shown if `permission !== 'granted'`
-- Tapping the bell calls `subscribe()` which triggers the browser's native permission dialog
+### Additional Step: Verify `send-push-notification` Deployment
 
----
+The `send-push-notification` edge function has zero logs, meaning it may have never been successfully deployed. After fixing the cron timeout, we should also deploy this function and test it to ensure push notifications work end-to-end.
 
-### Technical note on VAPID signing in Deno
+### Files to Modify
 
-Since Deno doesn't have the `web-push` npm package, the `send-push-notification` function implements the VAPID JWT signing using Deno's built-in Web Crypto API:
-1. Import the private key as an EC P-256 CryptoKey
-2. Build a JWT with `{"typ":"JWT","alg":"ES256"}` header and `{"aud", "exp", "sub"}` claims
-3. Sign with `crypto.subtle.sign("ECDSA", key, data)`
-4. Encrypt the push payload using the subscription's `p256dh` and `auth` keys (RFC 8291)
-5. POST to the push endpoint with the `Authorization: vapid ...` header
+| File | Action | Description |
+|------|--------|-------------|
+| Database migration | Create | Drop and re-create cron job with 120s timeout |
 
-This is a self-contained implementation with zero external imports.
+No code file changes are needed -- this is purely a database/cron configuration fix.
+
