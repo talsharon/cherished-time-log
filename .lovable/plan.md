@@ -1,58 +1,72 @@
 
 
-## Fix: VAPID JWT `BadJwtToken` Error
+## Debug: VAPID JWT Rejection by Apple Push Service
 
 ### Problem
 
-The push service returns `403 BadJwtToken`, meaning the hand-rolled VAPID JWT signature is malformed. The manual ECDSA signing + base64url encoding has a subtle encoding bug that's hard to pinpoint.
+The `jose`-based JWT is being generated successfully but Apple's push service still returns `403 BadJwtToken`. Since the JWT library itself is well-tested, the issue is likely in one of:
 
-### Solution
+1. **Mismatched key pair** -- the VAPID_PRIVATE_KEY and VAPID_PUBLIC_KEY secrets may not be a matching P-256 key pair
+2. **Invalid `sub` claim** -- VAPID_SUBJECT must be a valid `mailto:` or `https:` URI
+3. **Key format issue** -- the raw bytes derived from the env vars may not produce correct JWK `x`/`y`/`d` parameters
+4. **`k=` parameter mismatch** -- the public key in the Authorization header must exactly match the key that signed the JWT
 
-Replace the manual JWT construction with the `jose` library (works natively in Deno via `npm:jose`). This is a widely-used, well-tested library that handles ES256 JWT creation correctly across all runtimes including Deno.
+### Plan
+
+Add comprehensive diagnostic logging to `send-push-notification` so the next test reveals the exact cause. The logs will show:
+
+- The `aud` and `sub` claims being used
+- Whether the public key starts with `0x04` (uncompressed point prefix)
+- Whether the private key is 32 bytes (correct for P-256)
+- The first few characters of the `k=` parameter vs the frontend key
+- The decoded JWT header and payload (non-sensitive parts)
 
 ### Changes
 
 | File | Change |
 |------|--------|
-| `supabase/functions/send-push-notification/index.ts` | Replace manual `buildVapidJWT` with `jose`-based implementation |
+| `supabase/functions/send-push-notification/index.ts` | Add debug logging before the push fetch call |
 
 ### Technical Details
 
 **File: `supabase/functions/send-push-notification/index.ts`**
 
-1. Add import: `import { SignJWT, importJWK } from "npm:jose@6"` (Deno npm specifier)
-
-2. Replace `buildVapidJWT()` with:
+Add logging after JWT generation (around line 245) and before the push fetch (line 270):
 
 ```typescript
-async function buildVapidJWT(
-  endpoint: string,
-  privateKeyBase64: string,
-  publicKeyBase64: string,
-  subject: string
-): Promise<string> {
-  const url = new URL(endpoint);
-  const audience = `${url.protocol}//${url.host}`;
+// After building JWT
+const jwt = await buildVapidJWT(endpoint, vapidPrivateKey, vapidPublicKey, vapidSubject);
 
-  // Derive JWK parameters from raw keys
-  const privateKeyBytes = base64urlToBytes(privateKeyBase64);
-  const publicKeyBytes = base64urlToBytes(publicKeyBase64);
+// Debug logging
+const pubKeyBytes = base64urlToBytes(vapidPublicKey);
+const privKeyBytes = base64urlToBytes(vapidPrivateKey);
+console.log("VAPID Debug:", JSON.stringify({
+  endpoint_origin: new URL(endpoint).origin,
+  subject: vapidSubject,
+  pub_key_length: pubKeyBytes.length,
+  pub_key_first_byte: pubKeyBytes[0],
+  priv_key_length: privKeyBytes.length,
+  k_param_preview: vapidPublicKey.substring(0, 10),
+  frontend_key_preview: "BApU5xo2mM",
+  jwt_parts: jwt.split(".").length,
+}));
 
-  const x = bytesToBase64url(publicKeyBytes.slice(1, 33));
-  const y = bytesToBase64url(publicKeyBytes.slice(33, 65));
-  const d = bytesToBase64url(privateKeyBytes);
-
-  const jwk = { kty: "EC", crv: "P-256", x, y, d };
-  const key = await importJWK(jwk, "ES256");
-
-  return new SignJWT({ aud: audience, sub: subject })
-    .setProtectedHeader({ typ: "JWT", alg: "ES256" })
-    .setExpirationTime("12h")
-    .sign(key);
+// Decode JWT payload to verify claims
+try {
+  const payloadPart = jwt.split(".")[1];
+  const decoded = JSON.parse(atob(payloadPart.replace(/-/g, "+").replace(/_/g, "/")));
+  console.log("JWT claims:", JSON.stringify(decoded));
+} catch (e) {
+  console.error("Failed to decode JWT:", e);
 }
 ```
 
-This eliminates all manual base64url JWT encoding and ECDSA signature handling, delegating it to a proven library. The `jose` library is the most popular JS/TS JWT library (~100M downloads/week) and handles all edge cases correctly.
+This will reveal:
+- If `pub_key_length` is not 65 or `pub_key_first_byte` is not 4: the public key format is wrong
+- If `priv_key_length` is not 32: the private key format is wrong
+- If `k_param_preview` does not match `frontend_key_preview`: the keys are mismatched
+- If `subject` is not a `mailto:` or `https:` URL: Apple will reject the JWT
+- The actual JWT claims so we can verify `aud` and `exp` are correct
 
-No other files need to change. The function will be redeployed automatically.
+After running one test with this logging, we'll have the information needed to apply the correct fix.
 
