@@ -1,65 +1,46 @@
 
 
-## Fix: Replace Hand-Rolled Encryption with `web-push` Library
+## Investigation Results
 
-### Problem
+The cron job **did run** today at 06:30 UTC — but it got a **401 Unauthorized** response.
 
-The VAPID signing now works (push service returns 201), but the browser silently drops the notification because the RFC 8291 payload encryption is incorrectly implemented. The hand-rolled HKDF key derivation has several bugs:
+**Root cause:** The HTTP request to the edge function is missing the `apikey` header. The gateway requires this header even when `verify_jwt = false`.
 
-- Incorrect IKM construction (appends `0x00` byte to shared secret)
-- Missing two-stage HKDF (should extract with auth secret, then with random salt)
-- Wrong info strings for CEK and nonce derivation
-
-### Solution
-
-Replace the entire hand-rolled encryption AND push delivery logic with the `web-push` npm package, which correctly implements RFC 8291, RFC 8188, and VAPID. This eliminates ~150 lines of error-prone crypto code.
-
-### Changes
-
-| File | Change |
-|------|--------|
-| `supabase/functions/send-push-notification/index.ts` | Replace hand-rolled crypto with `npm:web-push` library |
-
-### Technical Details
-
-**File: `supabase/functions/send-push-notification/index.ts`**
-
-The entire file will be simplified to roughly:
-
-```typescript
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import webpush from "npm:web-push@3";
-
-// CORS headers (unchanged)
-
-serve(async (req) => {
-  // OPTIONS handler (unchanged)
-  // Auth check (unchanged)
-  // Parse request body (unchanged)
-  // Fetch subscription from DB (unchanged)
-
-  // NEW: Use web-push library for delivery
-  webpush.setVapidDetails(
-    vapidSubject,
-    vapidPublicKey,
-    vapidPrivateKey
-  );
-
-  const payload = JSON.stringify({ title, body });
-
-  await webpush.sendNotification(subscription, payload);
-
-  // Return success (unchanged)
-});
+**Current cron command sends:**
+```
+headers: { "Content-Type", "Authorization": "Bearer <service_role_key>" }
 ```
 
-This removes:
-- `buildVapidJWT()` function (~25 lines)
-- `encryptPayload()` function (~110 lines)
-- `base64urlToBytes()` and `bytesToBase64url()` helpers (~12 lines)
-- Manual aes128gcm header construction (~15 lines)
-- The `jose` import (web-push handles JWT internally)
+**Missing:** `"apikey"` header (required by the gateway).
 
-The `web-push` library is the standard Node.js/Deno library for Web Push (~4M downloads/week) and correctly handles all the cryptographic details.
+---
+
+## Fix
+
+Update the cron job to include the `apikey` header. The vault has `service_role_key` but no `anon_key`, so we'll use the service role key for both (which works since it has higher privileges).
+
+**SQL to run (drop and recreate the cron job):**
+
+```sql
+SELECT cron.unschedule('weekly-insights-saturday');
+
+SELECT cron.schedule(
+  'weekly-insights-saturday',
+  '30 6 * * 6',
+  $$
+  SELECT net.http_post(
+    url := 'https://zpjltjjqzkqwpufxceqq.supabase.co/functions/v1/generate-insights',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key'),
+      'apikey', (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key')
+    ),
+    body := '{"system_call": true}'::jsonb,
+    timeout_milliseconds := 120000
+  ) AS request_id;
+  $$
+);
+```
+
+This adds the `apikey` header using the service role key from vault, which the gateway needs to route the request.
 
