@@ -1,46 +1,33 @@
 
 
-## Investigation Results
+## Test Cron Job - One-Time Run
 
-The cron job **did run** today at 06:30 UTC — but it got a **401 Unauthorized** response.
+We'll create a temporary one-time cron job that runs in ~10 minutes to verify the fix works, then remove it.
 
-**Root cause:** The HTTP request to the edge function is missing the `apikey` header. The gateway requires this header even when `verify_jwt = false`.
+### Steps
 
-**Current cron command sends:**
-```
-headers: { "Content-Type", "Authorization": "Bearer <service_role_key>" }
-```
+1. **Create a one-time test cron job** scheduled to run at the next upcoming minute mark (~10 minutes from now). Since I don't know the exact current time, I'll schedule it using a one-time `cron.schedule` that runs every minute for a short window, then immediately unschedule it after one execution.
 
-**Missing:** `"apikey"` header (required by the gateway).
-
----
-
-## Fix
-
-Update the cron job to include the `apikey` header. The vault has `service_role_key` but no `anon_key`, so we'll use the service role key for both (which works since it has higher privileges).
-
-**SQL to run (drop and recreate the cron job):**
+**Simpler approach:** Use `net.http_post` directly as a one-off SQL call (no cron needed) to test if the headers work:
 
 ```sql
-SELECT cron.unschedule('weekly-insights-saturday');
-
-SELECT cron.schedule(
-  'weekly-insights-saturday',
-  '30 6 * * 6',
-  $$
-  SELECT net.http_post(
-    url := 'https://zpjltjjqzkqwpufxceqq.supabase.co/functions/v1/generate-insights',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key'),
-      'apikey', (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key')
-    ),
-    body := '{"system_call": true}'::jsonb,
-    timeout_milliseconds := 120000
-  ) AS request_id;
-  $$
-);
+SELECT net.http_post(
+  url := 'https://zpjltjjqzkqwpufxceqq.supabase.co/functions/v1/generate-insights',
+  headers := jsonb_build_object(
+    'Content-Type', 'application/json',
+    'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key'),
+    'apikey', (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key')
+  ),
+  body := '{"system_call": true}'::jsonb,
+  timeout_milliseconds := 120000
+) AS request_id;
 ```
 
-This adds the `apikey` header using the service role key from vault, which the gateway needs to route the request.
+This fires the exact same HTTP request the cron job would send — same URL, same headers, same body — but immediately. No need to wait 10 minutes. After it runs, we check `net._http_response` for the result and verify the edge function logs to confirm it worked.
+
+2. **Wait ~30 seconds** for the request to complete (the function needs time to call the AI gateway).
+
+3. **Check the response** in `net._http_response` and edge function logs to confirm success.
+
+This tests the exact same code path as the cron job without needing to schedule anything.
 
