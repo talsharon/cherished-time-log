@@ -315,9 +315,15 @@ serve(async (req) => {
 
     const { weekStart, weekEnd } = getPreviousWeekRange();
 
-    // Detect system call (cron) vs manual user call
-    const isSystemCall = authHeader === `Bearer ${supabaseServiceKey}`;
-    console.log(`Auth check: header starts with "Bearer eyJ"=${authHeader?.startsWith("Bearer eyJ")}, serviceKey starts with "eyJ"=${supabaseServiceKey?.startsWith("eyJ")}, isSystemCall=${isSystemCall}, headerLen=${authHeader?.length}, expectedLen=${"Bearer ".length + (supabaseServiceKey?.length || 0)}`);
+    // Detect system call (cron) vs manual user call by checking JWT role claim
+    let isSystemCall = false;
+    try {
+      const token = authHeader.replace("Bearer ", "");
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      isSystemCall = payload.role === "service_role";
+    } catch {
+      isSystemCall = false;
+    }
 
     if (isSystemCall) {
       // SYSTEM CALL: process all users that have active sessions
