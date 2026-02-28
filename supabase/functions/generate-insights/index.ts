@@ -317,6 +317,7 @@ serve(async (req) => {
 
     // Detect system call (cron) vs manual user call
     const isSystemCall = authHeader === `Bearer ${supabaseServiceKey}`;
+    console.log(`Auth check: header starts with "Bearer eyJ"=${authHeader?.startsWith("Bearer eyJ")}, serviceKey starts with "eyJ"=${supabaseServiceKey?.startsWith("eyJ")}, isSystemCall=${isSystemCall}, headerLen=${authHeader?.length}, expectedLen=${"Bearer ".length + (supabaseServiceKey?.length || 0)}`);
 
     if (isSystemCall) {
       // SYSTEM CALL: process all users that have active sessions
