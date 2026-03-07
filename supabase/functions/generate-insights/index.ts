@@ -95,6 +95,8 @@ async function processUserInsights(
 
   console.log(`[${userId}] Found ${weekLogs.length} logs for this week.`);
 
+  console.log(`[${userId}] Step 2: Fetching historical logs...`);
+
   // Fetch HISTORICAL logs for comparison (up to 500, before this week)
   const { data: historicalLogs, error: histLogsError } = await adminClient
     .from("logs")
@@ -105,9 +107,11 @@ async function processUserInsights(
     .limit(500);
 
   if (histLogsError) {
-    console.error(`Error fetching historical logs for user ${userId}:`, histLogsError);
-    return;
+    console.error(`[${userId}] ERROR fetching historical logs:`, histLogsError);
+    return false;
   }
+
+  console.log(`[${userId}] Found ${(historicalLogs || []).length} historical logs.`);
 
   // Fetch existing categories
   const { data: categories } = await adminClient
