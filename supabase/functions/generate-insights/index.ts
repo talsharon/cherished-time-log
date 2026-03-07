@@ -252,17 +252,19 @@ ${breakdown}
 
   if (!aiResponse.ok) {
     const errorText = await aiResponse.text();
-    console.error(`AI gateway error for user ${userId}:`, aiResponse.status, errorText);
-    return;
+    console.error(`[${userId}] ERROR: AI gateway returned status ${aiResponse.status}:`, errorText);
+    return false;
   }
 
   const aiData = await aiResponse.json();
   const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
 
   if (!toolCall || toolCall.function.name !== "submit_weekly_analysis") {
-    console.error(`Unexpected AI response for user ${userId}:`, aiData);
-    return;
+    console.error(`[${userId}] ERROR: Unexpected AI response structure:`, JSON.stringify(aiData).substring(0, 500));
+    return false;
   }
+
+  console.log(`[${userId}] Step 4: AI responded successfully. Parsing and saving...`);
 
   const analysis: AnalysisResult = JSON.parse(toolCall.function.arguments);
 
