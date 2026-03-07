@@ -426,10 +426,24 @@ serve(async (req) => {
         );
       }
 
-      await processUserInsights(adminClient, user.id, weekStart, weekEnd, lovableApiKey);
+      const success = await processUserInsights(adminClient, user.id, weekStart, weekEnd, lovableApiKey);
 
       const weekStartStr = weekStart.toISOString().split("T")[0];
       const weekEndStr = weekEnd.toISOString().split("T")[0];
+
+      if (!success) {
+        return new Response(
+          JSON.stringify({
+            error: "Failed to generate insights. Check logs for details.",
+            week_start: weekStartStr,
+            week_end: weekEndStr,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
 
       return new Response(
         JSON.stringify({
