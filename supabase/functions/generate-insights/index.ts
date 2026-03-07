@@ -72,6 +72,8 @@ async function processUserInsights(
   const weekStartStr = weekStart.toISOString().split("T")[0];
   const weekEndStr = weekEnd.toISOString().split("T")[0];
 
+  console.log(`[${userId}] Step 1: Fetching week logs (${weekStartStr} - ${weekEndStr})...`);
+
   // Fetch THIS WEEK's logs (what we're analyzing)
   const { data: weekLogs, error: weekLogsError } = await adminClient
     .from("logs")
@@ -82,14 +84,16 @@ async function processUserInsights(
     .order("start_time", { ascending: true });
 
   if (weekLogsError) {
-    console.error(`Error fetching week logs for user ${userId}:`, weekLogsError);
-    return;
+    console.error(`[${userId}] ERROR fetching week logs:`, weekLogsError);
+    return false;
   }
 
   if (!weekLogs || weekLogs.length === 0) {
-    console.log(`No logs for user ${userId} in week ${weekStartStr} - ${weekEndStr}. Skipping.`);
-    return;
+    console.log(`[${userId}] No logs found for this week. Skipping.`);
+    return false;
   }
+
+  console.log(`[${userId}] Found ${weekLogs.length} logs for this week.`);
 
   // Fetch HISTORICAL logs for comparison (up to 500, before this week)
   const { data: historicalLogs, error: histLogsError } = await adminClient
