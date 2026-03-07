@@ -150,86 +150,105 @@ ${breakdown}
     statsBlock
   );
 
-  // Call Lovable AI
-  const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${lovableApiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
-      messages: [{ role: "user", content: prompt }],
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: "submit_weekly_analysis",
-            description: "Submit the complete weekly time tracking analysis",
-            parameters: {
-              type: "object",
-              properties: {
-                summary: {
-                  type: "string",
-                  description:
-                    "A comprehensive summary paragraph in HEBREW of the week's activities (3-5 sentences)",
-                },
-                insights: {
-                  type: "string",
-                  description:
-                    "Detailed insights in HEBREW as formatted text with bullet points and bold headers using ** markdown. Include all relevant observations.",
-                },
-                recommendations: {
-                  type: "string",
-                  description:
-                    "Actionable recommendations in HEBREW as formatted text with bullet points and bold headers using ** markdown (3-5 items)",
-                },
-                new_categories: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      name: { type: "string" },
-                      description: { type: "string" },
-                    },
-                    required: ["name", "description"],
+  console.log(`[${userId}] Step 3: Calling AI gateway...`);
+
+  // AbortController with 60-second timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+  let aiResponse: Response;
+  try {
+    aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableApiKey}`,
+        "Content-Type": "application/json",
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [{ role: "user", content: prompt }],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "submit_weekly_analysis",
+              description: "Submit the complete weekly time tracking analysis",
+              parameters: {
+                type: "object",
+                properties: {
+                  summary: {
+                    type: "string",
+                    description:
+                      "A comprehensive summary paragraph in HEBREW of the week's activities (3-5 sentences)",
                   },
-                  description: "New categories discovered that don't exist in the provided list",
-                },
-                graphs: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      title: { type: "string" },
-                      type: { type: "string", enum: ["pie", "bar", "line"] },
-                      data: {
-                        type: "array",
-                        items: {
-                          type: "object",
-                          properties: {
-                            name: { type: "string" },
-                            value: { type: "number" },
-                            date: { type: "string" },
+                  insights: {
+                    type: "string",
+                    description:
+                      "Detailed insights in HEBREW as formatted text with bullet points and bold headers using ** markdown. Include all relevant observations.",
+                  },
+                  recommendations: {
+                    type: "string",
+                    description:
+                      "Actionable recommendations in HEBREW as formatted text with bullet points and bold headers using ** markdown (3-5 items)",
+                  },
+                  new_categories: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string" },
+                        description: { type: "string" },
+                      },
+                      required: ["name", "description"],
+                    },
+                    description: "New categories discovered that don't exist in the provided list",
+                  },
+                  graphs: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        title: { type: "string" },
+                        type: { type: "string", enum: ["pie", "bar", "line"] },
+                        data: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              name: { type: "string" },
+                              value: { type: "number" },
+                              date: { type: "string" },
+                            },
+                            required: ["name", "value"],
                           },
-                          required: ["name", "value"],
                         },
                       },
+                      required: ["title", "type", "data"],
                     },
-                    required: ["title", "type", "data"],
+                    minItems: 2,
+                    maxItems: 3,
                   },
-                  minItems: 2,
-                  maxItems: 3,
                 },
+                required: ["summary", "insights", "recommendations", "new_categories", "graphs"],
               },
-              required: ["summary", "insights", "recommendations", "new_categories", "graphs"],
             },
           },
-        },
-      ],
-      tool_choice: { type: "function", function: { name: "submit_weekly_analysis" } },
-    }),
-  });
+        ],
+        tool_choice: { type: "function", function: { name: "submit_weekly_analysis" } },
+      }),
+    });
+  } catch (fetchError) {
+    clearTimeout(timeoutId);
+    if (fetchError instanceof DOMException && fetchError.name === "AbortError") {
+      console.error(`[${userId}] ERROR: AI gateway call timed out after 60 seconds`);
+    } else {
+      console.error(`[${userId}] ERROR: AI gateway fetch failed:`, fetchError);
+    }
+    return false;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!aiResponse.ok) {
     const errorText = await aiResponse.text();
