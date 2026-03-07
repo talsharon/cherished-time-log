@@ -68,9 +68,11 @@ async function processUserInsights(
   weekStart: Date,
   weekEnd: Date,
   lovableApiKey: string
-): Promise<void> {
+): Promise<boolean> {
   const weekStartStr = weekStart.toISOString().split("T")[0];
   const weekEndStr = weekEnd.toISOString().split("T")[0];
+
+  console.log(`[${userId}] Step 1: Fetching week logs (${weekStartStr} - ${weekEndStr})...`);
 
   // Fetch THIS WEEK's logs (what we're analyzing)
   const { data: weekLogs, error: weekLogsError } = await adminClient
@@ -82,14 +84,18 @@ async function processUserInsights(
     .order("start_time", { ascending: true });
 
   if (weekLogsError) {
-    console.error(`Error fetching week logs for user ${userId}:`, weekLogsError);
-    return;
+    console.error(`[${userId}] ERROR fetching week logs:`, weekLogsError);
+    return false;
   }
 
   if (!weekLogs || weekLogs.length === 0) {
-    console.log(`No logs for user ${userId} in week ${weekStartStr} - ${weekEndStr}. Skipping.`);
-    return;
+    console.log(`[${userId}] No logs found for this week. Skipping.`);
+    return false;
   }
+
+  console.log(`[${userId}] Found ${weekLogs.length} logs for this week.`);
+
+  console.log(`[${userId}] Step 2: Fetching historical logs...`);
 
   // Fetch HISTORICAL logs for comparison (up to 500, before this week)
   const { data: historicalLogs, error: histLogsError } = await adminClient
@@ -101,9 +107,11 @@ async function processUserInsights(
     .limit(500);
 
   if (histLogsError) {
-    console.error(`Error fetching historical logs for user ${userId}:`, histLogsError);
-    return;
+    console.error(`[${userId}] ERROR fetching historical logs:`, histLogsError);
+    return false;
   }
+
+  console.log(`[${userId}] Found ${(historicalLogs || []).length} historical logs.`);
 
   // Fetch existing categories
   const { data: categories } = await adminClient
@@ -142,100 +150,121 @@ ${breakdown}
     statsBlock
   );
 
-  // Call Lovable AI
-  const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${lovableApiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
-      messages: [{ role: "user", content: prompt }],
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: "submit_weekly_analysis",
-            description: "Submit the complete weekly time tracking analysis",
-            parameters: {
-              type: "object",
-              properties: {
-                summary: {
-                  type: "string",
-                  description:
-                    "A comprehensive summary paragraph in HEBREW of the week's activities (3-5 sentences)",
-                },
-                insights: {
-                  type: "string",
-                  description:
-                    "Detailed insights in HEBREW as formatted text with bullet points and bold headers using ** markdown. Include all relevant observations.",
-                },
-                recommendations: {
-                  type: "string",
-                  description:
-                    "Actionable recommendations in HEBREW as formatted text with bullet points and bold headers using ** markdown (3-5 items)",
-                },
-                new_categories: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      name: { type: "string" },
-                      description: { type: "string" },
-                    },
-                    required: ["name", "description"],
+  console.log(`[${userId}] Step 3: Calling AI gateway...`);
+
+  // AbortController with 60-second timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+  let aiResponse: Response;
+  try {
+    aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableApiKey}`,
+        "Content-Type": "application/json",
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [{ role: "user", content: prompt }],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "submit_weekly_analysis",
+              description: "Submit the complete weekly time tracking analysis",
+              parameters: {
+                type: "object",
+                properties: {
+                  summary: {
+                    type: "string",
+                    description:
+                      "A comprehensive summary paragraph in HEBREW of the week's activities (3-5 sentences)",
                   },
-                  description: "New categories discovered that don't exist in the provided list",
-                },
-                graphs: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      title: { type: "string" },
-                      type: { type: "string", enum: ["pie", "bar", "line"] },
-                      data: {
-                        type: "array",
-                        items: {
-                          type: "object",
-                          properties: {
-                            name: { type: "string" },
-                            value: { type: "number" },
-                            date: { type: "string" },
+                  insights: {
+                    type: "string",
+                    description:
+                      "Detailed insights in HEBREW as formatted text with bullet points and bold headers using ** markdown. Include all relevant observations.",
+                  },
+                  recommendations: {
+                    type: "string",
+                    description:
+                      "Actionable recommendations in HEBREW as formatted text with bullet points and bold headers using ** markdown (3-5 items)",
+                  },
+                  new_categories: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string" },
+                        description: { type: "string" },
+                      },
+                      required: ["name", "description"],
+                    },
+                    description: "New categories discovered that don't exist in the provided list",
+                  },
+                  graphs: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        title: { type: "string" },
+                        type: { type: "string", enum: ["pie", "bar", "line"] },
+                        data: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              name: { type: "string" },
+                              value: { type: "number" },
+                              date: { type: "string" },
+                            },
+                            required: ["name", "value"],
                           },
-                          required: ["name", "value"],
                         },
                       },
+                      required: ["title", "type", "data"],
                     },
-                    required: ["title", "type", "data"],
+                    minItems: 2,
+                    maxItems: 3,
                   },
-                  minItems: 2,
-                  maxItems: 3,
                 },
+                required: ["summary", "insights", "recommendations", "new_categories", "graphs"],
               },
-              required: ["summary", "insights", "recommendations", "new_categories", "graphs"],
             },
           },
-        },
-      ],
-      tool_choice: { type: "function", function: { name: "submit_weekly_analysis" } },
-    }),
-  });
+        ],
+        tool_choice: { type: "function", function: { name: "submit_weekly_analysis" } },
+      }),
+    });
+  } catch (fetchError) {
+    clearTimeout(timeoutId);
+    if (fetchError instanceof DOMException && fetchError.name === "AbortError") {
+      console.error(`[${userId}] ERROR: AI gateway call timed out after 60 seconds`);
+    } else {
+      console.error(`[${userId}] ERROR: AI gateway fetch failed:`, fetchError);
+    }
+    return false;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!aiResponse.ok) {
     const errorText = await aiResponse.text();
-    console.error(`AI gateway error for user ${userId}:`, aiResponse.status, errorText);
-    return;
+    console.error(`[${userId}] ERROR: AI gateway returned status ${aiResponse.status}:`, errorText);
+    return false;
   }
 
   const aiData = await aiResponse.json();
   const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
 
   if (!toolCall || toolCall.function.name !== "submit_weekly_analysis") {
-    console.error(`Unexpected AI response for user ${userId}:`, aiData);
-    return;
+    console.error(`[${userId}] ERROR: Unexpected AI response structure:`, JSON.stringify(aiData).substring(0, 500));
+    return false;
   }
+
+  console.log(`[${userId}] Step 4: AI responded successfully. Parsing and saving...`);
 
   const analysis: AnalysisResult = JSON.parse(toolCall.function.arguments);
 
@@ -266,30 +295,33 @@ ${breakdown}
   );
 
   if (upsertError) {
-    console.error(`Error saving insight for user ${userId}:`, upsertError);
-  } else {
-    console.log(`Successfully generated insights for user ${userId} (${weekStartStr} - ${weekEndStr})`);
-
-    // Send push notification
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    try {
-      await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${supabaseServiceKey}`,
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          title: "Time Tracker",
-          body: "Your weekly insights are ready! 📊",
-        }),
-      });
-    } catch (pushErr) {
-      console.warn(`Push notification failed for user ${userId}:`, pushErr);
-    }
+    console.error(`[${userId}] ERROR saving insight:`, upsertError);
+    return false;
   }
+
+  console.log(`[${userId}] Step 5: Upsert complete! Insight saved for ${weekStartStr} - ${weekEndStr}`);
+
+  // Send push notification
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        title: "Time Tracker",
+        body: "Your weekly insights are ready! 📊",
+      }),
+    });
+  } catch (pushErr) {
+    console.warn(`[${userId}] Push notification failed (non-critical):`, pushErr);
+  }
+
+  return true;
 }
 
 serve(async (req) => {
@@ -342,13 +374,17 @@ serve(async (req) => {
       }
 
       let processed = 0;
+      let failed = 0;
       for (const { user_id } of sessions) {
-        await processUserInsights(adminClient, user_id, weekStart, weekEnd, lovableApiKey);
-        processed++;
+        const success = await processUserInsights(adminClient, user_id, weekStart, weekEnd, lovableApiKey);
+        if (success) processed++;
+        else failed++;
       }
 
+      console.log(`Cron complete: ${processed} processed, ${failed} failed out of ${sessions.length} users.`);
+
       return new Response(
-        JSON.stringify({ success: true, processed_users: processed }),
+        JSON.stringify({ success: failed === 0, processed, failed }),
         {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -390,10 +426,24 @@ serve(async (req) => {
         );
       }
 
-      await processUserInsights(adminClient, user.id, weekStart, weekEnd, lovableApiKey);
+      const success = await processUserInsights(adminClient, user.id, weekStart, weekEnd, lovableApiKey);
 
       const weekStartStr = weekStart.toISOString().split("T")[0];
       const weekEndStr = weekEnd.toISOString().split("T")[0];
+
+      if (!success) {
+        return new Response(
+          JSON.stringify({
+            error: "Failed to generate insights. Check logs for details.",
+            week_start: weekStartStr,
+            week_end: weekEndStr,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
 
       return new Response(
         JSON.stringify({
