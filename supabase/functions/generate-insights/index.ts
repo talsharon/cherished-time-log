@@ -374,13 +374,17 @@ serve(async (req) => {
       }
 
       let processed = 0;
+      let failed = 0;
       for (const { user_id } of sessions) {
-        await processUserInsights(adminClient, user_id, weekStart, weekEnd, lovableApiKey);
-        processed++;
+        const success = await processUserInsights(adminClient, user_id, weekStart, weekEnd, lovableApiKey);
+        if (success) processed++;
+        else failed++;
       }
 
+      console.log(`Cron complete: ${processed} processed, ${failed} failed out of ${sessions.length} users.`);
+
       return new Response(
-        JSON.stringify({ success: true, processed_users: processed }),
+        JSON.stringify({ success: failed === 0, processed, failed }),
         {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
