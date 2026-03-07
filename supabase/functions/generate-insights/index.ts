@@ -68,7 +68,7 @@ async function processUserInsights(
   weekStart: Date,
   weekEnd: Date,
   lovableApiKey: string
-): Promise<void> {
+): Promise<boolean> {
   const weekStartStr = weekStart.toISOString().split("T")[0];
   const weekEndStr = weekEnd.toISOString().split("T")[0];
 
