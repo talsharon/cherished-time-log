@@ -295,30 +295,33 @@ ${breakdown}
   );
 
   if (upsertError) {
-    console.error(`Error saving insight for user ${userId}:`, upsertError);
-  } else {
-    console.log(`Successfully generated insights for user ${userId} (${weekStartStr} - ${weekEndStr})`);
-
-    // Send push notification
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    try {
-      await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${supabaseServiceKey}`,
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          title: "Time Tracker",
-          body: "Your weekly insights are ready! 📊",
-        }),
-      });
-    } catch (pushErr) {
-      console.warn(`Push notification failed for user ${userId}:`, pushErr);
-    }
+    console.error(`[${userId}] ERROR saving insight:`, upsertError);
+    return false;
   }
+
+  console.log(`[${userId}] Step 5: Upsert complete! Insight saved for ${weekStartStr} - ${weekEndStr}`);
+
+  // Send push notification
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        title: "Time Tracker",
+        body: "Your weekly insights are ready! 📊",
+      }),
+    });
+  } catch (pushErr) {
+    console.warn(`[${userId}] Push notification failed (non-critical):`, pushErr);
+  }
+
+  return true;
 }
 
 serve(async (req) => {
