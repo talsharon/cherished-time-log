@@ -8,18 +8,19 @@ struct InsightsTabView: View {
         NavigationStack {
             Group {
                 if viewModel.loading {
-                    ProgressView()
+                    insightsSkeleton
                 } else if viewModel.insights.isEmpty {
-                    ContentUnavailableView(
-                        "No insights yet",
-                        systemImage: "chart.bar.doc.horizontal",
-                        description: Text("Use the sparkles button on the Clock tab to generate weekly insights.")
-                    )
+                    insightsEmpty
                 } else {
                     insightsList
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(AppTheme.background)
             .navigationTitle("Insights")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(AppTheme.background, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -27,8 +28,11 @@ struct InsightsTabView: View {
                     } label: {
                         if viewModel.generating {
                             ProgressView()
+                                .tint(AppTheme.accent)
                         } else {
                             Label("Generate", systemImage: "sparkles")
+                                .labelStyle(.iconOnly)
+                                .foregroundStyle(AppTheme.accent)
                         }
                     }
                     .disabled(viewModel.generating)
@@ -40,11 +44,44 @@ struct InsightsTabView: View {
                 if let err = viewModel.errorMessage {
                     Text(err)
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(AppTheme.destructive)
                         .padding()
                 }
             }
         }
+    }
+
+    private var insightsSkeleton: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 24) {
+                ForEach(0 ..< 3, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: AppTheme.radiusCard, style: .continuous)
+                        .fill(AppTheme.secondary.opacity(0.5))
+                        .frame(height: 180)
+                        .redacted(reason: .placeholder)
+                }
+            }
+            .padding()
+        }
+        .background(AppTheme.background)
+    }
+
+    private var insightsEmpty: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "chart.bar.doc.horizontal")
+                .font(.system(size: 52))
+                .foregroundStyle(AppTheme.textMuted.opacity(0.65))
+            Text("No insights yet")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(AppTheme.foreground)
+            Text("Use the sparkles button on the Clock tab to generate weekly insights.")
+                .font(.subheadline)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(AppTheme.textMuted)
+                .padding(.horizontal, 28)
+                .environment(\.layoutDirection, .rightToLeft)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var insightsList: some View {
@@ -62,18 +99,23 @@ struct InsightsTabView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("\(insight.weekStart) → \(insight.weekEnd)")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.textMuted)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .environment(\.layoutDirection, .rightToLeft)
 
             Text("Summary")
                 .font(.headline)
+                .foregroundStyle(AppTheme.foreground)
             hebrewBlock(insight.summary)
 
             Text("Insights")
                 .font(.headline)
+                .foregroundStyle(AppTheme.foreground)
             hebrewBlock(insight.insights)
 
             Text("Recommendations")
                 .font(.headline)
+                .foregroundStyle(AppTheme.foreground)
             hebrewBlock(insight.recommendations)
 
             ForEach(Array(insight.graphs.enumerated()), id: \.offset) { _, graph in
@@ -81,14 +123,22 @@ struct InsightsTabView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: AppTheme.radiusCard, style: .continuous)
+                .fill(AppTheme.secondary.opacity(0.35))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: AppTheme.radiusCard, style: .continuous)
+                .stroke(AppTheme.border.opacity(0.85), lineWidth: 1)
+        )
         .environment(\.layoutDirection, .rightToLeft)
     }
 
     private func hebrewBlock(_ text: String) -> some View {
         Text(text)
-            .font(.body)
+            .font(.subheadline)
+            .foregroundStyle(AppTheme.textMuted)
             .multilineTextAlignment(.trailing)
             .frame(maxWidth: .infinity, alignment: .trailing)
     }
@@ -97,14 +147,21 @@ struct InsightsTabView: View {
 private struct InsightChartView: View {
     let graph: InsightGraph
 
-    private let colors: [Color] = [
-        .blue, .orange, .green, .purple, .pink, .yellow, .red, .cyan,
-    ]
+    private var accentPalette: [Color] {
+        [
+            AppTheme.accent,
+            AppTheme.accent.opacity(0.75),
+            AppTheme.accent.opacity(0.55),
+            AppTheme.textMuted,
+            AppTheme.secondary,
+        ]
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(graph.title)
                 .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppTheme.foreground)
                 .multilineTextAlignment(.trailing)
                 .frame(maxWidth: .infinity, alignment: .trailing)
 
@@ -129,8 +186,8 @@ private struct InsightChartView: View {
                 innerRadius: .ratio(0.45),
                 angularInset: 1
             )
-            .foregroundStyle(colors[i % colors.count])
-            .opacity(0.9)
+            .foregroundStyle(accentPalette[i % accentPalette.count])
+            .opacity(0.95)
         }
     }
 
@@ -140,7 +197,7 @@ private struct InsightChartView: View {
                 x: .value("Name", p.name),
                 y: .value("Minutes", p.value)
             )
-            .foregroundStyle(.blue.gradient)
+            .foregroundStyle(AppTheme.accent.gradient)
         }
     }
 
@@ -150,10 +207,13 @@ private struct InsightChartView: View {
                 x: .value("Index", i),
                 y: .value("Minutes", p.value)
             )
+            .foregroundStyle(AppTheme.accent)
+            .lineStyle(StrokeStyle(lineWidth: 2))
             PointMark(
                 x: .value("Index", i),
                 y: .value("Minutes", p.value)
             )
+            .foregroundStyle(AppTheme.accent)
         }
     }
 }

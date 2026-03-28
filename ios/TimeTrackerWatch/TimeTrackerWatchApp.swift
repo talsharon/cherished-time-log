@@ -8,6 +8,7 @@ struct TimeTrackerWatchApp: App {
         WindowGroup {
             WatchContentView()
                 .environmentObject(wc)
+                .preferredColorScheme(.dark)
         }
     }
 }

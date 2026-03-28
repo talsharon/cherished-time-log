@@ -18,6 +18,7 @@ struct TimeTrackerApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
+                .preferredColorScheme(.dark)
         }
     }
 }

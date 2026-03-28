@@ -9,7 +9,7 @@ struct WatchContentView: View {
                 if let err = wc.lastError {
                     Text(err)
                         .font(.caption2)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(AppTheme.destructive)
                         .multilineTextAlignment(.center)
                 }
 
@@ -19,15 +19,17 @@ struct WatchContentView: View {
                     let tac = (wc.tacticalStart ?? wc.mainStart).map { Int(now.timeIntervalSince($0)) } ?? 0
                     VStack(spacing: 4) {
                         Text(formatHMS(tac))
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(AppTheme.textMuted)
                         Text(formatHMS(main))
-                            .font(.title3.monospacedDigit())
+                            .font(.title2.monospacedDigit().weight(.medium))
+                            .foregroundStyle(AppTheme.foreground)
                     }
                 }
 
                 Text(wc.currentTitle)
                     .font(.headline)
+                    .foregroundStyle(AppTheme.foreground)
                     .multilineTextAlignment(.center)
 
                 Picker("Title", selection: Binding(
@@ -37,20 +39,25 @@ struct WatchContentView: View {
                     ForEach(wc.titles, id: \.self) { Text($0).tag($0) }
                 }
                 .labelsHidden()
+                .tint(AppTheme.accent)
 
                 Button("DONE") {
                     wc.send(WCConstants.actionDone)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .tint(AppTheme.accent)
 
                 Button("Reset tactical") {
                     wc.send(WCConstants.actionResetTactical)
                 }
                 .buttonStyle(.bordered)
+                .tint(AppTheme.textMuted)
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 4)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.background)
     }
 
     private func formatHMS(_ total: Int) -> String {

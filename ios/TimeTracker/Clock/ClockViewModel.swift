@@ -162,10 +162,7 @@ final class ClockViewModel: ObservableObject, WatchCommandHandler {
     }
 
     func color(for title: String) -> Color {
-        if let t = titles.first(where: { $0.name == title }) {
-            return Color(hex: t.color) ?? .gray
-        }
-        return title == "Idle" ? .gray : .secondary
+        TitleColorResolver.color(for: title, titles: titles)
     }
 
     // MARK: - Watch
@@ -198,38 +195,5 @@ final class ClockViewModel: ObservableObject, WatchCommandHandler {
 
     func syncWatchContext() {
         PhoneSessionManager.shared.pushContextToWatch(snapshotForWatch())
-    }
-}
-
-// MARK: - Color from CSS-like string (HSL or hex)
-
-private extension Color {
-    init?(hex: String) {
-        let t = hex.trimmingCharacters(in: .whitespaces)
-        if t.hasPrefix("#"), t.count == 7 {
-            let s = String(t.dropFirst())
-            var n: UInt64 = 0
-            guard Scanner(string: s).scanHexInt64(&n) else { return nil }
-            let r = Double((n >> 16) & 0xFF) / 255
-            let g = Double((n >> 8) & 0xFF) / 255
-            let b = Double(n & 0xFF) / 255
-            self.init(red: r, green: g, blue: b)
-            return
-        }
-        if t.hasPrefix("hsl("), let c = Self.parseHSL(t) {
-            self = c
-            return
-        }
-        return nil
-    }
-
-    static func parseHSL(_ raw: String) -> Color? {
-        let inner = raw.dropFirst(4).dropLast().replacingOccurrences(of: " ", with: "")
-        let parts = inner.split(separator: ",").map(String.init)
-        guard parts.count >= 3,
-              let h = Double(parts[0]),
-              let s = Double(parts[1].replacingOccurrences(of: "%", with: "")),
-              let l = Double(parts[2].replacingOccurrences(of: "%", with: "")) else { return nil }
-        return Color(hue: h / 360, saturation: s / 100, brightness: l / 100)
     }
 }

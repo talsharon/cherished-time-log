@@ -8,45 +8,95 @@ struct AuthView: View {
     @State private var busy = false
     @State private var banner: String?
 
-    private enum Mode {
-        case signIn, signUp
+    private enum Mode: String, CaseIterable {
+        case signIn = "Sign In"
+        case signUp = "Sign Up"
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Email", text: $email)
-                        .textContentType(.emailAddress)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                    SecureField("Password", text: $password)
-                        .textContentType(mode == .signIn ? .password : .newPassword)
-                }
-                if let banner {
-                    Section {
+        ScrollView {
+            VStack(spacing: 28) {
+                brandRow
+
+                VStack(alignment: .leading, spacing: 20) {
+                    Picker("Mode", selection: $mode) {
+                        ForEach(Mode.allCases, id: \.self) { m in
+                            Text(m.rawValue).tag(m)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .tint(AppTheme.accent)
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        TextField("Email", text: $email)
+                            .textContentType(.emailAddress)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .textFieldStyle(ThemedTextFieldStyle())
+                        SecureField("Password", text: $password)
+                            .textContentType(mode == .signIn ? .password : .newPassword)
+                            .textFieldStyle(ThemedTextFieldStyle())
+                    }
+
+                    if let banner {
                         Text(banner)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppTheme.textMuted)
                     }
-                }
-                Section {
-                    Button(mode == .signIn ? "Sign In" : "Sign Up") {
+
+                    Button {
                         Task { await submit() }
+                    } label: {
+                        if busy {
+                            ProgressView()
+                                .tint(AppTheme.accentForeground)
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                        } else {
+                            Text(mode == .signIn ? "Sign In" : "Sign Up")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                        }
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppTheme.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: AppTheme.radiusButtonLarge, style: .continuous))
                     .disabled(busy || email.isEmpty || password.count < 6)
-                    Button(mode == .signIn ? "Need an account? Sign Up" : "Have an account? Sign In") {
-                        mode = mode == .signIn ? .signUp : .signIn
-                        banner = nil
-                    }
-                    .foregroundStyle(.secondary)
                 }
+                .padding(20)
+                .background(
+                    RoundedRectangle(cornerRadius: AppTheme.radiusCard, style: .continuous)
+                        .fill(AppTheme.secondary.opacity(0.45))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppTheme.radiusCard, style: .continuous)
+                        .stroke(AppTheme.border.opacity(0.9), lineWidth: 1)
+                )
+                .padding(.horizontal, 20)
             }
-            .navigationTitle("Time Tracker")
-            .overlay {
-                if busy { ProgressView().scaleEffect(1.2) }
-            }
+            .padding(.vertical, 32)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppTheme.background)
+        .overlay {
+            if busy { ProgressView().scaleEffect(1.2).tint(AppTheme.accent) }
+        }
+    }
+
+    private var brandRow: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: AppTheme.radiusBrand, style: .continuous)
+                    .fill(AppTheme.accent)
+                    .frame(width: 52, height: 52)
+                Image(systemName: "clock.fill")
+                    .font(.title2)
+                    .foregroundStyle(AppTheme.accentForeground)
+            }
+            Text("Time Tracker")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(AppTheme.foreground)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func submit() async {
