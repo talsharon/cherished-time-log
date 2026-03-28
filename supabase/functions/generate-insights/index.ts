@@ -520,6 +520,12 @@ IMPORTANT: Write ALL text responses (summary, insights, recommendations) in HEBR
 Category names should remain in ENGLISH for consistency.
 Graph titles should be in HEBREW.
 
+SLEEP HANDLING RULES:
+- Do NOT discuss sleep as a topic in your analysis. Sleep is a basic human need and not interesting to analyze.
+- ONLY mention sleep if you detect a truly unusual pattern (e.g., extreme fluctuations in sleep duration or timing compared to historical data).
+- All percentages and distributions must be calculated from WAKING TIME ONLY (sleep logs are already excluded from the stats below).
+- The pie chart must show waking time distribution only (no sleep category).
+
 WEEK BEING ANALYZED: ${weekStart} (Saturday) to ${weekEnd} (Friday)
 
 ${statsBlock}
