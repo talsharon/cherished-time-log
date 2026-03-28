@@ -169,10 +169,10 @@ function InsightCard({ insight }: InsightCardProps) {
 
   return (
     <Card className="mb-4">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base font-medium">{dateRange}</CardTitle>
+      <CardHeader className="pb-2" dir="rtl">
+        <CardTitle className="text-base font-medium text-right">{dateRange}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4" dir="rtl">
         {/* Summary */}
         <div>
           <h3 className="text-sm font-semibold mb-1">Summary</h3>
