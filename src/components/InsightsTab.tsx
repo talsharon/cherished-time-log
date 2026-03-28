@@ -50,7 +50,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
       elements.push(
         <li
           key={index}
-          className="ml-4 text-sm text-muted-foreground"
+          className="mr-4 text-sm text-muted-foreground text-right"
           dangerouslySetInnerHTML={{ __html: processedLine.replace('- ', '') }}
         />
       );
