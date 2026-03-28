@@ -1,0 +1,21 @@
+Native iOS + watchOS app (SwiftUI + Supabase)
+
+1) Optional: copy ios/Config/Secrets.xcconfig.example to ios/Config/Secrets.xcconfig (gitignored) and set real Supabase URL + anon key (same as web VITE_*). Without it, the project still builds using Base.xcconfig placeholders; the app shows “Supabase not configured” until real values are set (placeholders are rejected on purpose).
+
+2) Install XcodeGen if needed: brew install xcodegen
+
+3) From repo root: cd ios && xcodegen generate (required after editing project.yml or Info.plist layout).
+
+Tip: Do not put a raw https://... URL on one line in .xcconfig — "//" starts a comment. Copy Secrets.xcconfig.example and use SUPABASE_HOST + the COLON/SLASH lines as shown there.
+
+4) Open ios/TimeTracker.xcodeproj in Xcode (regenerate after changing project.yml).
+
+5) Signing: select your Team on targets TimeTracker and TimeTrackerWatch.
+
+6) Build & Run on iPhone (Watch app embeds when Watch is paired).
+
+Apple Developer Program is required for device + Watch.
+
+Push: weekly insight notifications use Web Push on the web app only; native uses no APNs in v1 (see migration plan).
+
+Optional later: APNs device tokens + Edge Function for iPhone/Watch push; distribute with TestFlight (Xcode → Product → Archive → Distribute App).
