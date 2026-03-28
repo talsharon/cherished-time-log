@@ -67,7 +67,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
       elements.push(
         <p
           key={index}
-          className="text-sm text-muted-foreground"
+          className="text-sm text-muted-foreground text-right"
           dangerouslySetInnerHTML={{ __html: processedLine }}
         />
       );
