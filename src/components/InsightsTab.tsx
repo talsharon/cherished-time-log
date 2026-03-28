@@ -50,7 +50,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
       elements.push(
         <li
           key={index}
-          className="ml-4 text-sm text-muted-foreground"
+          className="mr-4 text-sm text-muted-foreground text-right"
           dangerouslySetInnerHTML={{ __html: processedLine.replace('- ', '') }}
         />
       );
@@ -59,7 +59,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
       elements.push(
         <li
           key={index}
-          className="ml-4 text-sm text-muted-foreground list-decimal"
+          className="mr-4 text-sm text-muted-foreground list-decimal text-right"
           dangerouslySetInnerHTML={{ __html: processedLine.replace(/^\d+\.\s*/, '') }}
         />
       );
@@ -67,7 +67,7 @@ function renderMarkdown(text: string): React.ReactNode[] {
       elements.push(
         <p
           key={index}
-          className="text-sm text-muted-foreground"
+          className="text-sm text-muted-foreground text-right"
           dangerouslySetInnerHTML={{ __html: processedLine }}
         />
       );
@@ -169,25 +169,25 @@ function InsightCard({ insight }: InsightCardProps) {
 
   return (
     <Card className="mb-4">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base font-medium">{dateRange}</CardTitle>
+      <CardHeader className="pb-2" dir="rtl">
+        <CardTitle className="text-base font-medium text-right">{dateRange}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4" dir="rtl">
         {/* Summary */}
         <div>
-          <h3 className="text-sm font-semibold mb-1">Summary</h3>
+          <h3 className="text-sm font-semibold mb-1 text-right">Summary</h3>
           <p className="text-sm text-muted-foreground">{insight.summary}</p>
         </div>
 
         {/* Insights */}
         <div>
-          <h3 className="text-sm font-semibold mb-1">Insights</h3>
+          <h3 className="text-sm font-semibold mb-1 text-right">Insights</h3>
           <div className="space-y-1">{renderMarkdown(insight.insights)}</div>
         </div>
 
         {/* Recommendations */}
         <div>
-          <h3 className="text-sm font-semibold mb-1">Recommendations</h3>
+          <h3 className="text-sm font-semibold mb-1 text-right">Recommendations</h3>
           <div className="space-y-1">{renderMarkdown(insight.recommendations)}</div>
         </div>
 
@@ -226,7 +226,7 @@ function InsightsLoading() {
 
 function EmptyInsights() {
   return (
-    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+    <div className="flex flex-col items-center justify-center h-full p-8 text-center" dir="rtl">
       <div className="text-muted-foreground mb-4">
         <svg
           className="w-16 h-16 mx-auto mb-4 opacity-50"
