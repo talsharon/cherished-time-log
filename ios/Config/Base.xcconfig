@@ -1,0 +1,12 @@
+SWIFT_VERSION = 5.0
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+WATCHOS_DEPLOYMENT_TARGET = 10.0
+CURRENT_PROJECT_VERSION = 1
+MARKETING_VERSION = 1.0
+
+// Build Supabase URL without writing "//" on a line — unquoted https:// is treated as comment in .xcconfig.
+COLON = :
+SLASH = /
+SUPABASE_HOST = placeholder.supabase.co
+SUPABASE_URL = https$(COLON)$(SLASH)$(SLASH)$(SUPABASE_HOST)
+SUPABASE_ANON_KEY = placeholder
