@@ -53,6 +53,7 @@ struct ThemedTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
             .padding(.horizontal, 12)
+            .padding(.vertical, 12)
             .frame(minHeight: 48)
             .background(AppTheme.secondary.opacity(0.6))
             .clipShape(RoundedRectangle(cornerRadius: AppTheme.radiusCard, style: .continuous))

@@ -58,6 +58,7 @@ struct MainTabView: View {
         }
         .background(AppTheme.background.ignoresSafeArea())
         .tint(AppTheme.accent)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     private var shellHeader: some View {

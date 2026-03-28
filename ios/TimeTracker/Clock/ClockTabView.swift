@@ -1,6 +1,13 @@
 import SwiftUI
 
 struct ClockTabView: View {
+    private static let sessionStartTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.timeStyle = .short
+        f.dateStyle = .none
+        return f
+    }()
+
     @ObservedObject var viewModel: ClockViewModel
     @FocusState private var commentFocused: Bool
     @State private var newTitleSheet = false
@@ -38,6 +45,16 @@ struct ClockTabView: View {
             .accessibilityLabel("Generate insights")
         }
         .background(AppTheme.background)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    commentFocused = false
+                }
+                .font(.body.weight(.semibold))
+                .foregroundStyle(AppTheme.accent)
+            }
+        }
         .task {
             PhoneSessionManager.shared.commandHandler = viewModel
             await viewModel.load()
@@ -139,34 +156,41 @@ struct ClockTabView: View {
                         .font(.body)
                         .foregroundStyle(AppTheme.textMuted)
 
-                    Picker("Title", selection: Binding(
-                        get: { viewModel.currentTitle },
-                        set: { v in
-                            if v == "__new__" {
-                                newTitleSheet = true
-                            } else {
-                                Task { await viewModel.updateTitle(v) }
-                            }
+                    Menu {
+                        Button("Create new…") {
+                            newTitleSheet = true
                         }
-                    )) {
-                        Text("Create new…").tag("__new__")
-                        ForEach(viewModel.titles.sorted(by: { a, b in
-                            if a.name == "Idle" { return true }
-                            if b.name == "Idle" { return false }
-                            return a.name < b.name
-                        }), id: \.id) { t in
-                            HStack {
-                                Circle()
-                                    .fill(viewModel.color(for: t.name))
-                                    .frame(width: 10, height: 10)
-                                Text(t.name)
-                                    .foregroundStyle(AppTheme.foreground)
+                        ForEach(sortedActivityTitles, id: \.id) { t in
+                            Button {
+                                Task { await viewModel.updateTitle(t.name) }
+                            } label: {
+                                Label {
+                                    Text(t.name)
+                                } icon: {
+                                    Image(uiImage: TitleDotUIImage.dotImage(color: viewModel.color(for: t.name)))
+                                        .renderingMode(.original)
+                                        .resizable()
+                                        .frame(width: 10, height: 10)
+                                }
                             }
-                            .tag(t.name)
+                            .labelStyle(.titleAndIcon)
                         }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(viewModel.color(for: viewModel.currentTitle))
+                                .frame(width: 10, height: 10)
+                            Text(viewModel.currentTitle)
+                                .foregroundStyle(AppTheme.foreground)
+                            Spacer(minLength: 8)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AppTheme.textMuted)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
                     }
-                    .pickerStyle(.menu)
-                    .tint(AppTheme.foreground)
+                    .accessibilityLabel("Activity, \(viewModel.currentTitle)")
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
                     .frame(minHeight: 48)
@@ -177,9 +201,8 @@ struct ClockTabView: View {
                             .stroke(AppTheme.border.opacity(0.8), lineWidth: 1)
                     )
 
-                    TextField("Add a comment…", text: $viewModel.currentComment, axis: .vertical)
+                    TextField("Add a comment…", text: $viewModel.currentComment)
                         .textFieldStyle(ThemedTextFieldStyle())
-                        .lineLimit(2 ... 4)
                         .focused($commentFocused)
                         .onChange(of: viewModel.currentComment) { _, new in
                             Task { await viewModel.updateComment(new) }
@@ -211,6 +234,15 @@ struct ClockTabView: View {
             }
             .padding(.top, 44)
         }
+        .scrollDismissesKeyboard(.interactively)
+    }
+
+    private var sortedActivityTitles: [TitleRow] {
+        viewModel.titles.sorted(by: { a, b in
+            if a.name == "Idle" { return true }
+            if b.name == "Idle" { return false }
+            return a.name < b.name
+        })
     }
 
     private var tacticalBlock: some View {
@@ -239,9 +271,16 @@ struct ClockTabView: View {
                         .font(.system(size: 64, weight: .light, design: .monospaced))
                         .monospacedDigit()
                         .foregroundStyle(AppTheme.foreground)
-                    Text("Started — tap to edit")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.textMuted)
+                    if let start = viewModel.startTime {
+                        Text("Started \(Self.sessionStartTimeFormatter.string(from: start)) · tap to edit")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.textMuted)
+                            .multilineTextAlignment(.center)
+                    } else {
+                        Text("Not running")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.textMuted)
+                    }
                 }
             }
             .buttonStyle(.plain)
