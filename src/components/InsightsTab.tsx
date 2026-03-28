@@ -175,7 +175,7 @@ function InsightCard({ insight }: InsightCardProps) {
       <CardContent className="space-y-4" dir="rtl">
         {/* Summary */}
         <div>
-          <h3 className="text-sm font-semibold mb-1">Summary</h3>
+          <h3 className="text-sm font-semibold mb-1 text-right">Summary</h3>
           <p className="text-sm text-muted-foreground">{insight.summary}</p>
         </div>
 
