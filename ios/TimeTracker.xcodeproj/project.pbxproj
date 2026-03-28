@@ -11,11 +11,16 @@
 		114BD09027B6CFFA69A8318C /* WatchConnectivityModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8B1F4E5B192C1641EB0D47E /* WatchConnectivityModel.swift */; };
 		1B5CED7279EEE678351221E5 /* TimeTrackerWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 588B6D0215B2CAF8246F93A8 /* TimeTrackerWatchApp.swift */; };
 		2B59E1EF919B36E293A9E707 /* InsightsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 214E5071BA20DEF97EE9665B /* InsightsViewModel.swift */; };
+		30FC118865D60D2383048B10 /* LogCardGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A262CA1462A4BAAAE7BC97B /* LogCardGeometry.swift */; };
+		48A794203F6038C251C0511A /* TitleColorResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77002A92D17F8CE5868822E /* TitleColorResolver.swift */; };
+		4C1CAB9299437F3EC36339AB /* CSSColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28766E9F5CBDA94A11EE99E /* CSSColor.swift */; };
+		4FEA4742B57B1F99E024CE27 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60D420E7EC999B085051E2F /* AppTheme.swift */; };
 		5A95810A88A6E808FE499DE1 /* DatabaseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E22C357C2AE9CFF6B118F770 /* DatabaseModels.swift */; };
 		637D53DE69F5B6905194620A /* WCConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CF2D45E531DE4A7BCE2BC74 /* WCConstants.swift */; };
 		668F8E5F156D809C1C9C7E06 /* ClockTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FED8AA653E6738BC7EC337D /* ClockTabView.swift */; };
 		701CDFE9F925ECB6D1AD2778 /* TimeTrackerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B173286388839F33C3FAA564 /* TimeTrackerApp.swift */; };
 		80BB1E9E86B4C3D32DA5AE9C /* TimeTrackerSupabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26F9899383970B9B8F43F5CA /* TimeTrackerSupabase.swift */; };
+		83CC581568414C8ADA22596A /* CSSColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C28766E9F5CBDA94A11EE99E /* CSSColor.swift */; };
 		877A6EE65C32C421A6783852 /* LogsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBD8424B5B600636328DE07B /* LogsViewModel.swift */; };
 		92747BB18C2847A5FA5F8FD7 /* PhoneSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3958AB724A08D99EA22AA55 /* PhoneSessionManager.swift */; };
 		ADE11D462D0A068721E46548 /* InsightsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C40C6205094B668FD80DDC6 /* InsightsTabView.swift */; };
@@ -33,6 +38,7 @@
 		E727B3856156A761FB567A01 /* TimeTrackerWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = ACAA166369E67C3B09563F12 /* TimeTrackerWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		ED0CD3B09DB0CF5AB40932D3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 943B4D377432DA396308BDAB /* Assets.xcassets */; };
 		F4F800C2FC21318F174913A4 /* WatchContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86EB4AAAE3E97CC4D4405DFF /* WatchContentView.swift */; };
+		FA934AA57F789517D54AB8E9 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60D420E7EC999B085051E2F /* AppTheme.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,20 +75,24 @@
 		284C61FC4D3F5425114B3BDB /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		2FED8AA653E6738BC7EC337D /* ClockTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockTabView.swift; sourceTree = "<group>"; };
 		588B6D0215B2CAF8246F93A8 /* TimeTrackerWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTrackerWatchApp.swift; sourceTree = "<group>"; };
+		5A262CA1462A4BAAAE7BC97B /* LogCardGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogCardGeometry.swift; sourceTree = "<group>"; };
 		7C40C6205094B668FD80DDC6 /* InsightsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsTabView.swift; sourceTree = "<group>"; };
 		7CF2D45E531DE4A7BCE2BC74 /* WCConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WCConstants.swift; sourceTree = "<group>"; };
 		86EB4AAAE3E97CC4D4405DFF /* WatchContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchContentView.swift; sourceTree = "<group>"; };
 		943B4D377432DA396308BDAB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		961B7F69DD97EE2BD1559F9C /* LogSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogSheets.swift; sourceTree = "<group>"; };
-		A5474E4E0BCDFAF982ABA880 /* TimeTracker.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TimeTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A5474E4E0BCDFAF982ABA880 /* TimeTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TimeTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		ACAA166369E67C3B09563F12 /* TimeTrackerWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TimeTrackerWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AEAB8E12BF5ECBDCE5B8805C /* InsightsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsService.swift; sourceTree = "<group>"; };
 		B173286388839F33C3FAA564 /* TimeTrackerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTrackerApp.swift; sourceTree = "<group>"; };
 		B3958AB724A08D99EA22AA55 /* PhoneSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneSessionManager.swift; sourceTree = "<group>"; };
+		B60D420E7EC999B085051E2F /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		B8B1F4E5B192C1641EB0D47E /* WatchConnectivityModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchConnectivityModel.swift; sourceTree = "<group>"; };
+		C28766E9F5CBDA94A11EE99E /* CSSColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSSColor.swift; sourceTree = "<group>"; };
 		C31A6BB7A4C5A2E715D85F81 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		D188A481691C901A196DEFA1 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
 		D49738E866B244822DB0C975 /* LogsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogsTabView.swift; sourceTree = "<group>"; };
+		D77002A92D17F8CE5868822E /* TitleColorResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TitleColorResolver.swift; sourceTree = "<group>"; };
 		E22C357C2AE9CFF6B118F770 /* DatabaseModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseModels.swift; sourceTree = "<group>"; };
 		E903DDF1B746841D638B896D /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		EBD8424B5B600636328DE07B /* LogsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogsViewModel.swift; sourceTree = "<group>"; };
@@ -144,6 +154,7 @@
 			isa = PBXGroup;
 			children = (
 				E22C357C2AE9CFF6B118F770 /* DatabaseModels.swift */,
+				D77002A92D17F8CE5868822E /* TitleColorResolver.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -160,6 +171,8 @@
 		60BC7CFAFD0FC8F8B744A970 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				B60D420E7EC999B085051E2F /* AppTheme.swift */,
+				C28766E9F5CBDA94A11EE99E /* CSSColor.swift */,
 				7CF2D45E531DE4A7BCE2BC74 /* WCConstants.swift */,
 			);
 			path = Shared;
@@ -188,6 +201,7 @@
 		6E69876662467D7505E51243 /* Logs */ = {
 			isa = PBXGroup;
 			children = (
+				5A262CA1462A4BAAAE7BC97B /* LogCardGeometry.swift */,
 				961B7F69DD97EE2BD1559F9C /* LogSheets.swift */,
 				1399CC75CB39EE762CF48855 /* LogsModels.swift */,
 				D49738E866B244822DB0C975 /* LogsTabView.swift */,
@@ -289,8 +303,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1500;
-				TargetAttributes = {
-				};
 			};
 			buildConfigurationList = CA02C8256257C68402D03771 /* Build configuration list for PBXProject "TimeTracker" */;
 			developmentRegion = en;
@@ -340,13 +352,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				AF6C0707AEA7ECF00513DA81 /* AppConfig.swift in Sources */,
+				FA934AA57F789517D54AB8E9 /* AppTheme.swift in Sources */,
 				B2CDF63331E93CA252DFC622 /* AuthView.swift in Sources */,
+				83CC581568414C8ADA22596A /* CSSColor.swift in Sources */,
 				668F8E5F156D809C1C9C7E06 /* ClockTabView.swift in Sources */,
 				C58D1A45B6833F3C7BB3AD34 /* ClockViewModel.swift in Sources */,
 				5A95810A88A6E808FE499DE1 /* DatabaseModels.swift in Sources */,
 				D06A4B2F68B981607D722983 /* InsightsService.swift in Sources */,
 				ADE11D462D0A068721E46548 /* InsightsTabView.swift in Sources */,
 				2B59E1EF919B36E293A9E707 /* InsightsViewModel.swift in Sources */,
+				30FC118865D60D2383048B10 /* LogCardGeometry.swift in Sources */,
 				00978131EE6B2112281B62CA /* LogSheets.swift in Sources */,
 				BA7C859A9B790BC9F59E8201 /* LogsModels.swift in Sources */,
 				E474560EB760DA4AEA3DEDB0 /* LogsTabView.swift in Sources */,
@@ -356,6 +371,7 @@
 				CB6D105442A04CED1C08BCBC /* RootView.swift in Sources */,
 				701CDFE9F925ECB6D1AD2778 /* TimeTrackerApp.swift in Sources */,
 				80BB1E9E86B4C3D32DA5AE9C /* TimeTrackerSupabase.swift in Sources */,
+				48A794203F6038C251C0511A /* TitleColorResolver.swift in Sources */,
 				637D53DE69F5B6905194620A /* WCConstants.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -364,6 +380,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4FEA4742B57B1F99E024CE27 /* AppTheme.swift in Sources */,
+				4C1CAB9299437F3EC36339AB /* CSSColor.swift in Sources */,
 				1B5CED7279EEE678351221E5 /* TimeTrackerWatchApp.swift in Sources */,
 				B0F66B37FDCB580A1D4127EA /* WCConstants.swift in Sources */,
 				114BD09027B6CFFA69A8318C /* WatchConnectivityModel.swift in Sources */,
@@ -387,6 +405,7 @@
 			baseConfigurationReference = C31A6BB7A4C5A2E715D85F81 /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = VU3XR9LNT8;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Time;
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.cherished.TimeTracker;
@@ -523,6 +542,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = VU3XR9LNT8;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TimeTracker/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Time Tracker";
@@ -543,6 +563,7 @@
 			baseConfigurationReference = 284C61FC4D3F5425114B3BDB /* Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = VU3XR9LNT8;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Time;
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.cherished.TimeTracker;
@@ -560,6 +581,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = VU3XR9LNT8;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TimeTracker/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Time Tracker";
