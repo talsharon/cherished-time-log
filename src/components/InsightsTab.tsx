@@ -187,7 +187,7 @@ function InsightCard({ insight }: InsightCardProps) {
 
         {/* Recommendations */}
         <div>
-          <h3 className="text-sm font-semibold mb-1">Recommendations</h3>
+          <h3 className="text-sm font-semibold mb-1 text-right">Recommendations</h3>
           <div className="space-y-1">{renderMarkdown(insight.recommendations)}</div>
         </div>
 
