@@ -25,6 +25,7 @@
 		92747BB18C2847A5FA5F8FD7 /* PhoneSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3958AB724A08D99EA22AA55 /* PhoneSessionManager.swift */; };
 		ADE11D462D0A068721E46548 /* InsightsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C40C6205094B668FD80DDC6 /* InsightsTabView.swift */; };
 		AF6C0707AEA7ECF00513DA81 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = E903DDF1B746841D638B896D /* AppConfig.swift */; };
+		B0BA91176534F7DD3CF84EA2 /* TitleDotUIImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3652A8CF61493532564F8ECD /* TitleDotUIImage.swift */; };
 		B0F66B37FDCB580A1D4127EA /* WCConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CF2D45E531DE4A7BCE2BC74 /* WCConstants.swift */; };
 		B2CDF63331E93CA252DFC622 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D188A481691C901A196DEFA1 /* AuthView.swift */; };
 		B38594066227B2522A2CC5A3 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157D053883D42F4D202487D6 /* MainTabView.swift */; };
@@ -74,6 +75,7 @@
 		26F9899383970B9B8F43F5CA /* TimeTrackerSupabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTrackerSupabase.swift; sourceTree = "<group>"; };
 		284C61FC4D3F5425114B3BDB /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		2FED8AA653E6738BC7EC337D /* ClockTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockTabView.swift; sourceTree = "<group>"; };
+		3652A8CF61493532564F8ECD /* TitleDotUIImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TitleDotUIImage.swift; sourceTree = "<group>"; };
 		588B6D0215B2CAF8246F93A8 /* TimeTrackerWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTrackerWatchApp.swift; sourceTree = "<group>"; };
 		5A262CA1462A4BAAAE7BC97B /* LogCardGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogCardGeometry.swift; sourceTree = "<group>"; };
 		7C40C6205094B668FD80DDC6 /* InsightsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsTabView.swift; sourceTree = "<group>"; };
@@ -215,6 +217,7 @@
 			children = (
 				2FED8AA653E6738BC7EC337D /* ClockTabView.swift */,
 				22C2D9E06407253517E6C694 /* ClockViewModel.swift */,
+				3652A8CF61493532564F8ECD /* TitleDotUIImage.swift */,
 			);
 			path = Clock;
 			sourceTree = "<group>";
@@ -372,6 +375,7 @@
 				701CDFE9F925ECB6D1AD2778 /* TimeTrackerApp.swift in Sources */,
 				80BB1E9E86B4C3D32DA5AE9C /* TimeTrackerSupabase.swift in Sources */,
 				48A794203F6038C251C0511A /* TitleColorResolver.swift in Sources */,
+				B0BA91176534F7DD3CF84EA2 /* TitleDotUIImage.swift in Sources */,
 				637D53DE69F5B6905194620A /* WCConstants.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
