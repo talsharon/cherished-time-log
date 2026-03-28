@@ -1,0 +1,26 @@
+---
+description: When asking the user for permission, explain what and why before acting
+alwaysApply: true
+---
+
+# Permission requests
+
+**Scope:** This file applies **only to this repository**. For the same behavior in **all projects**, add the text from `~/.cursor/user-rules/permission-requests.txt` to **Cursor → Settings → Rules** (User rules). If you use User rules globally, you can delete this file to avoid duplicate instructions in this workspace.
+
+---
+
+Before any step that needs **explicit user approval** (destructive operations, git writes, installs, network access, credentials, paid services, device/signing changes, or anything irreversible), do all of the following **in the same message**:
+
+1. **What** — Name the exact action (command, file change, dashboard click, or scope of edits).
+2. **Why** — What it unlocks, what fails or is blocked if skipped, and any meaningful risk or tradeoff.
+3. **If declined** — One short line on the alternative or fallback, when one exists.
+
+Then **wait for confirmation** before executing that step, unless the user has already given blanket approval for the current task.
+
+**Example**
+
+> **Permission:** Run `brew install xcodegen` on your Mac.  
+> **Why:** Generates `TimeTracker.xcodeproj` from `project.yml` per the migration plan; avoids maintaining a hand-written `pbxproj`. Uses Homebrew and network once.  
+> **If you decline:** You can install XcodeGen yourself, or create the Xcode project manually and I will only add source files.
+
+Keep this pattern brief; do not skip the why.
