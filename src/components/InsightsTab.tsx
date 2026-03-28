@@ -226,7 +226,7 @@ function InsightsLoading() {
 
 function EmptyInsights() {
   return (
-    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+    <div className="flex flex-col items-center justify-center h-full p-8 text-center" dir="rtl">
       <div className="text-muted-foreground mb-4">
         <svg
           className="w-16 h-16 mx-auto mb-4 opacity-50"
