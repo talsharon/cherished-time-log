@@ -120,24 +120,31 @@ async function processUserInsights(
     .eq("user_id", userId);
 
   // Pre-compute stats so the AI doesn't need to sum raw logs
+  const sleepPattern = /sleep|שינה/i;
   const totalSeconds = weekLogs.reduce((sum: number, l: any) => sum + l.duration, 0);
   const totalHours = Math.floor(totalSeconds / 3600);
   const totalMinutes = Math.round((totalSeconds % 3600) / 60);
 
+  const wakingLogs = weekLogs.filter((l: any) => !sleepPattern.test(l.title));
+  const totalWakingSeconds = wakingLogs.reduce((sum: number, l: any) => sum + l.duration, 0);
+  const wakingHours = Math.floor(totalWakingSeconds / 3600);
+  const wakingMinutes = Math.round((totalWakingSeconds % 3600) / 60);
+
   const byTitle: Record<string, number> = {};
-  for (const log of weekLogs) {
+  for (const log of wakingLogs) {
     byTitle[log.title] = (byTitle[log.title] || 0) + log.duration;
   }
   const breakdown = Object.entries(byTitle)
     .sort((a, b) => b[1] - a[1])
-    .map(([title, secs]) => `  - ${title}: ${(secs / 3600).toFixed(1)} hours (${((secs / totalSeconds) * 100).toFixed(1)}%)`)
+    .map(([title, secs]) => `  - ${title}: ${(secs / 3600).toFixed(1)} hours (${((secs / totalWakingSeconds) * 100).toFixed(1)}%)`)
     .join('\n');
 
   const statsBlock = `
 COMPUTED STATS (use these exact numbers, do NOT re-calculate from raw logs):
-- Total tracked time: ${totalHours} hours ${totalMinutes} minutes
-- Activity count: ${weekLogs.length} entries
-- Breakdown by activity:
+- Total tracked time (including sleep): ${totalHours} hours ${totalMinutes} minutes
+- Total WAKING time (excluding sleep): ${wakingHours} hours ${wakingMinutes} minutes
+- Activity count (waking): ${wakingLogs.length} entries
+- Breakdown by activity (percentages are of WAKING TIME only):
 ${breakdown}
 `;
 
