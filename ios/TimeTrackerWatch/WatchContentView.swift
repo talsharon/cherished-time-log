@@ -10,23 +10,27 @@ struct WatchContentView: View {
                     let now = timeline.date
                     let main = wc.mainStart.map { Int(now.timeIntervalSince($0)) } ?? 0
                     let tac = (wc.tacticalStart ?? wc.mainStart).map { Int(now.timeIntervalSince($0)) } ?? 0
+                    let tacticalResetSize: CGFloat = 44
+                    let tacticalSpacing: CGFloat = 6
                     VStack(spacing: 4) {
-                        HStack(alignment: .center, spacing: 6) {
+                        HStack(alignment: .center, spacing: tacticalSpacing) {
                             Text(formatHMS(tac))
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(AppTheme.textMuted)
-                            Spacer(minLength: 0)
                             Button {
                                 wc.send(WCConstants.actionResetTactical)
                             } label: {
                                 Image(systemName: "arrow.counterclockwise")
-                                    .font(.caption2.weight(.semibold))
+                                    .font(.title3.weight(.semibold))
                                     .foregroundStyle(AppTheme.textMuted)
+                                    .frame(width: tacticalResetSize, height: tacticalResetSize)
+                                    .contentShape(Rectangle())
                             }
-                            .buttonStyle(.borderless)
+                            .buttonStyle(.plain)
                             .accessibilityLabel("Reset tactical timer")
                         }
-                        .frame(maxWidth: .infinity)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .offset(x: (tacticalSpacing + tacticalResetSize) / 2)
 
                         Text(formatHMS(main))
                             .font(.title2.monospacedDigit().weight(.medium))

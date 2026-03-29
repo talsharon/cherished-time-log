@@ -83,6 +83,13 @@ extension WatchConnectivityModel: WCSessionDelegate {
         }
     }
 
+    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+        Task { @MainActor in
+            applyContext(message)
+            replyHandler([:])
+        }
+    }
+
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         Task { @MainActor in
             reachable = session.isReachable
