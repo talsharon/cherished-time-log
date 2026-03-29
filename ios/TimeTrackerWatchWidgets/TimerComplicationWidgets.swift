@@ -15,6 +15,14 @@ private func stopwatchInterval(from start: Date) -> ClosedRange<Date> {
 
 private enum TimerTimelineConstants {
     static let reloadMinutes = 30
+    static let notchCount = 12
+    static let notchPeriodSeconds = 900
+}
+
+private func categoryFilledNotchCount(at now: Date, mainStart: Date?) -> Int {
+    guard let mainStart else { return 0 }
+    let elapsed = max(0, Int(now.timeIntervalSince(mainStart)))
+    return min(TimerTimelineConstants.notchCount, 1 + (elapsed / TimerTimelineConstants.notchPeriodSeconds))
 }
 
 struct TimerTimelineProvider: TimelineProvider {
@@ -23,12 +31,12 @@ struct TimerTimelineProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (TimerEntry) -> Void) {
-        let (m, t, _) = TimerSnapshotStorage.load()
+        let (m, t, _, _) = TimerSnapshotStorage.load()
         completion(TimerEntry(date: Date(), mainStart: m, tacticalStart: t))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<TimerEntry>) -> Void) {
-        let (mainStart, tacticalStart, _) = TimerSnapshotStorage.load()
+        let (mainStart, tacticalStart, _, _) = TimerSnapshotStorage.load()
         let now = Date()
         let entry = TimerEntry(date: now, mainStart: mainStart, tacticalStart: tacticalStart)
         let reloadDate = Calendar.current.date(byAdding: .minute, value: TimerTimelineConstants.reloadMinutes, to: now)
@@ -43,25 +51,48 @@ struct TimerTimelineProvider: TimelineProvider {
 struct CategoryTitleEntry: TimelineEntry {
     let date: Date
     let title: String
+    let mainStart: Date?
+    let titleColor: String
 }
 
 struct CategoryTitleTimelineProvider: TimelineProvider {
     func placeholder(in context: Context) -> CategoryTitleEntry {
-        CategoryTitleEntry(date: .now, title: "Idle")
+        CategoryTitleEntry(date: .now, title: "Idle", mainStart: nil, titleColor: "hsl(0, 0%, 55%)")
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CategoryTitleEntry) -> Void) {
-        let (_, _, title) = TimerSnapshotStorage.load()
-        completion(CategoryTitleEntry(date: Date(), title: title))
+        let (mainStart, _, title, titleColor) = TimerSnapshotStorage.load()
+        completion(CategoryTitleEntry(date: Date(), title: title, mainStart: mainStart, titleColor: titleColor))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CategoryTitleEntry>) -> Void) {
-        let (_, _, title) = TimerSnapshotStorage.load()
+        let (mainStart, _, title, titleColor) = TimerSnapshotStorage.load()
         let now = Date()
-        let entry = CategoryTitleEntry(date: now, title: title)
-        let reloadDate = Calendar.current.date(byAdding: .minute, value: TimerTimelineConstants.reloadMinutes, to: now)
+        var entries: [CategoryTitleEntry] = [
+            CategoryTitleEntry(date: now, title: title, mainStart: mainStart, titleColor: titleColor),
+        ]
+
+        if let mainStart {
+            let currentFilled = categoryFilledNotchCount(at: now, mainStart: mainStart)
+            if currentFilled < TimerTimelineConstants.notchCount {
+                for targetFilled in (currentFilled + 1)...TimerTimelineConstants.notchCount {
+                    let boundaryDate = mainStart.addingTimeInterval(TimeInterval((targetFilled - 1) * TimerTimelineConstants.notchPeriodSeconds))
+                    if boundaryDate > now {
+                        entries.append(CategoryTitleEntry(date: boundaryDate, title: title, mainStart: mainStart, titleColor: titleColor))
+                    }
+                }
+            }
+        }
+
+        let fallbackReloadDate = Calendar.current.date(byAdding: .minute, value: TimerTimelineConstants.reloadMinutes, to: now)
             ?? now.addingTimeInterval(TimeInterval(TimerTimelineConstants.reloadMinutes * 60))
-        completion(Timeline(entries: [entry], policy: TimelineReloadPolicy.after(reloadDate)))
+        let policy: TimelineReloadPolicy
+        if let last = entries.last {
+            policy = .after(max(last.date.addingTimeInterval(60), fallbackReloadDate))
+        } else {
+            policy = .after(fallbackReloadDate)
+        }
+        completion(Timeline(entries: entries, policy: policy))
     }
 }
 
@@ -154,15 +185,50 @@ struct CornerTimerView: View {
 struct CategoryTitleCircularView: View {
     var entry: CategoryTitleEntry
 
+    private var activeNotchColor: Color {
+        Color(cssColor: entry.titleColor) ?? AppTheme.accent
+    }
+
+    private var inactiveNotchColor: Color {
+        Color.primary.opacity(0.2)
+    }
+
     var body: some View {
-        Text(entry.title)
-            .font(.system(.caption, design: .rounded))
-            .fontWeight(.semibold)
-            .foregroundStyle(.primary)
-            .multilineTextAlignment(.center)
-            .minimumScaleFactor(0.35)
-            .lineLimit(3)
-            .widgetURL(widgetOpenURL)
+        GeometryReader { proxy in
+            let size = min(proxy.size.width, proxy.size.height)
+            let ringInset = size * 0.1
+            let radius = (size / 2) - ringInset
+            let lineWidth = max(2, size * 0.08)
+            let filled = categoryFilledNotchCount(at: entry.date, mainStart: entry.mainStart)
+            let segmentSweep = 26.0
+
+            ZStack {
+                ForEach(0..<TimerTimelineConstants.notchCount, id: \.self) { index in
+                    let startAngle = Angle(degrees: -90 + (Double(index) * (360.0 / Double(TimerTimelineConstants.notchCount))))
+                    let endAngle = Angle(degrees: startAngle.degrees + segmentSweep)
+                    Path { path in
+                        path.addArc(
+                            center: CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2),
+                            radius: radius,
+                            startAngle: startAngle,
+                            endAngle: endAngle,
+                            clockwise: false
+                        )
+                    }
+                    .stroke(index < filled ? activeNotchColor : inactiveNotchColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                }
+
+                Text(entry.title)
+                    .font(.system(.caption2, design: .rounded))
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.45)
+                    .padding(size * 0.26)
+            }
+        }
+        .widgetURL(widgetOpenURL)
     }
 }
 
