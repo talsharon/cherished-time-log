@@ -10,6 +10,8 @@ final class WatchConnectivityModel: NSObject, ObservableObject {
     @Published var titles: [String] = ["Idle"]
     @Published var reachable = false
     @Published var lastError: String?
+    /// Shown when the user triggers an action while the iPhone app is not reachable.
+    @Published var showPhoneConnectionHint = false
 
     override init() {
         super.init()
@@ -43,6 +45,7 @@ final class WatchConnectivityModel: NSObject, ObservableObject {
         if WCSession.default.isReachable {
             WCSession.default.sendMessage(msg, replyHandler: { reply in
                 Task { @MainActor in
+                    self.showPhoneConnectionHint = false
                     self.applyContext(reply)
                 }
             }, errorHandler: { err in
@@ -51,7 +54,7 @@ final class WatchConnectivityModel: NSObject, ObservableObject {
                 }
             })
         } else {
-            lastError = "Open Time Tracker on iPhone"
+            showPhoneConnectionHint = true
         }
     }
 }
@@ -67,6 +70,9 @@ extension WatchConnectivityModel: WCSessionDelegate {
                 lastError = error.localizedDescription
             }
             reachable = session.isReachable
+            if session.isReachable {
+                showPhoneConnectionHint = false
+            }
             applyContext(session.receivedApplicationContext)
         }
     }
@@ -80,6 +86,9 @@ extension WatchConnectivityModel: WCSessionDelegate {
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         Task { @MainActor in
             reachable = session.isReachable
+            if session.isReachable {
+                showPhoneConnectionHint = false
+            }
         }
     }
 }

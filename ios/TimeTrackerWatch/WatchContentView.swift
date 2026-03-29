@@ -4,23 +4,30 @@ struct WatchContentView: View {
     @EnvironmentObject private var wc: WatchConnectivityModel
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                if let err = wc.lastError {
-                    Text(err)
-                        .font(.caption2)
-                        .foregroundStyle(AppTheme.destructive)
-                        .multilineTextAlignment(.center)
-                }
-
+        ZStack(alignment: .topLeading) {
+            VStack(spacing: 8) {
                 TimelineView(.periodic(from: .now, by: 1)) { timeline in
                     let now = timeline.date
                     let main = wc.mainStart.map { Int(now.timeIntervalSince($0)) } ?? 0
                     let tac = (wc.tacticalStart ?? wc.mainStart).map { Int(now.timeIntervalSince($0)) } ?? 0
                     VStack(spacing: 4) {
-                        Text(formatHMS(tac))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(AppTheme.textMuted)
+                        HStack(alignment: .center, spacing: 6) {
+                            Text(formatHMS(tac))
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(AppTheme.textMuted)
+                            Spacer(minLength: 0)
+                            Button {
+                                wc.send(WCConstants.actionResetTactical)
+                            } label: {
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(AppTheme.textMuted)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Reset tactical timer")
+                        }
+                        .frame(maxWidth: .infinity)
+
                         Text(formatHMS(main))
                             .font(.title2.monospacedDigit().weight(.medium))
                             .foregroundStyle(AppTheme.foreground)
@@ -43,20 +50,33 @@ struct WatchContentView: View {
                 .labelsHidden()
                 .tint(AppTheme.accent)
 
+                Spacer(minLength: 0)
+
                 Button("DONE") {
                     wc.send(WCConstants.actionDone)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(AppTheme.accent)
-
-                Button("Reset tactical") {
-                    wc.send(WCConstants.actionResetTactical)
-                }
-                .buttonStyle(.bordered)
-                .tint(AppTheme.textMuted)
             }
-            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, 4)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
+
+            if wc.showPhoneConnectionHint {
+                Button {
+                    // Visual hint only; reachability recovers when the iPhone app is active.
+                } label: {
+                    Image(systemName: "iphone.slash")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.red)
+                        .padding(6)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open Time Tracker on iPhone")
+                .padding(.leading, 2)
+                .padding(.top, 2)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppTheme.background)
