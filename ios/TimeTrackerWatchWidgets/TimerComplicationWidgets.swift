@@ -197,7 +197,7 @@ struct CategoryTitleCircularView: View {
             let lineWidth = max(2, size * 0.055)
             let filled = categoryFilledNotchCount(at: entry.date, mainStart: entry.mainStart)
             let slotDegrees = 360.0 / Double(TimerTimelineConstants.notchCount)
-            let segmentSweep = 16.0
+            let segmentSweep = 23.0
 
             ZStack {
                 ForEach(0..<filled, id: \.self) { index in
