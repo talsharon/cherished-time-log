@@ -14,7 +14,7 @@ struct WatchContentView: View {
                     let tacticalSpacing: CGFloat = 6
                     VStack(spacing: 4) {
                         HStack(alignment: .center, spacing: tacticalSpacing) {
-                            Text(formatHMS(tac))
+                            Text(StopwatchFormat.hms(totalSeconds: tac))
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(AppTheme.textMuted)
                             Button {
@@ -32,7 +32,7 @@ struct WatchContentView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                         .offset(x: (tacticalSpacing + tacticalResetSize) / 2)
 
-                        Text(formatHMS(main))
+                        Text(StopwatchFormat.hms(totalSeconds: main))
                             .font(.title2.monospacedDigit().weight(.medium))
                             .foregroundStyle(AppTheme.foreground)
                     }
@@ -86,12 +86,4 @@ struct WatchContentView: View {
         .background(AppTheme.background)
     }
 
-    private func formatHMS(_ total: Int) -> String {
-        let s = max(0, total)
-        let h = s / 3600
-        let m = (s % 3600) / 60
-        let r = s % 60
-        if h > 0 { return String(format: "%d:%02d:%02d", h, m, r) }
-        return String(format: "%d:%02d", m, r)
-    }
 }

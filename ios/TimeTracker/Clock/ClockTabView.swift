@@ -249,7 +249,7 @@ struct ClockTabView: View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             let ref = viewModel.tacticalStartTime ?? viewModel.startTime ?? timeline.date
             let sec = Int(timeline.date.timeIntervalSince(ref))
-            Text(formatHMS(sec))
+            Text(StopwatchFormat.hms(totalSeconds: sec))
                 .font(.system(size: 34, weight: .light, design: .monospaced))
                 .monospacedDigit()
                 .foregroundStyle(AppTheme.textMuted)
@@ -267,7 +267,7 @@ struct ClockTabView: View {
                 }
             } label: {
                 VStack(spacing: 6) {
-                    Text(formatHMS(sec))
+                    Text(StopwatchFormat.hms(totalSeconds: sec))
                         .font(.system(size: 64, weight: .light, design: .monospaced))
                         .monospacedDigit()
                         .foregroundStyle(AppTheme.foreground)
@@ -287,14 +287,4 @@ struct ClockTabView: View {
         }
     }
 
-    private func formatHMS(_ total: Int) -> String {
-        let s = max(0, total)
-        let h = s / 3600
-        let m = (s % 3600) / 60
-        let r = s % 60
-        if h > 0 {
-            return String(format: "%d:%02d:%02d", h, m, r)
-        }
-        return String(format: "%d:%02d", m, r)
-    }
 }
