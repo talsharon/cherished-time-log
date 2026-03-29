@@ -5,6 +5,8 @@ import WatchConnectivity
 @MainActor
 final class WatchConnectivityModel: NSObject, ObservableObject {
     @Published var currentTitle: String = "Idle"
+    /// Wheel updates immediately; phone sync runs after the crown stops (debounced).
+    @Published var pickerTitle: String = "Idle"
     @Published var mainStart: Date?
     @Published var tacticalStart: Date?
     @Published var titles: [String] = ["Idle"]
@@ -12,6 +14,9 @@ final class WatchConnectivityModel: NSObject, ObservableObject {
     @Published var lastError: String?
     /// Shown when the user triggers an action while the iPhone app is not reachable.
     @Published var showPhoneConnectionHint = false
+
+    private var titleCommitTask: Task<Void, Never>?
+    private static let titleCommitDebounceNs: UInt64 = 400_000_000
 
     override init() {
         super.init()
@@ -23,7 +28,10 @@ final class WatchConnectivityModel: NSObject, ObservableObject {
 
     func applyContext(_ dict: [String: Any]) {
         if let t = dict[WCConstants.stateTitle] as? String {
+            titleCommitTask?.cancel()
+            titleCommitTask = nil
             currentTitle = t
+            pickerTitle = t
         }
         if let ts = dict[WCConstants.stateMainStart] as? TimeInterval {
             mainStart = Date(timeIntervalSince1970: ts)
@@ -33,6 +41,17 @@ final class WatchConnectivityModel: NSObject, ObservableObject {
         }
         if let arr = dict["titles"] as? [String], !arr.isEmpty {
             titles = arr
+        }
+    }
+
+    func setPickerTitleDebounced(_ title: String) {
+        pickerTitle = title
+        titleCommitTask?.cancel()
+        let pending = title
+        titleCommitTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: Self.titleCommitDebounceNs)
+            guard !Task.isCancelled else { return }
+            send(WCConstants.actionUpdateTitle, title: pending)
         }
     }
 

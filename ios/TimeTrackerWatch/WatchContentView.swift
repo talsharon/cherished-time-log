@@ -39,8 +39,8 @@ struct WatchContentView: View {
                 }
 
                 Picker("Title", selection: Binding(
-                    get: { wc.currentTitle },
-                    set: { wc.send(WCConstants.actionUpdateTitle, title: $0) }
+                    get: { wc.pickerTitle },
+                    set: { wc.setPickerTitleDebounced($0) }
                 )) {
                     ForEach(wc.titles, id: \.self) { title in
                         Text(title)
