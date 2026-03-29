@@ -33,15 +33,31 @@ final class WatchConnectivityModel: NSObject, ObservableObject {
             currentTitle = t
             pickerTitle = t
         }
-        if let ts = dict[WCConstants.stateMainStart] as? TimeInterval {
-            mainStart = Date(timeIntervalSince1970: ts)
-        }
-        if let ts = dict[WCConstants.stateTacticalStart] as? TimeInterval {
-            tacticalStart = Date(timeIntervalSince1970: ts)
+        // Only merge timer anchors from a real phone snapshot (`snapshotForWatch` always
+        // includes `stateTitle`). Empty `[:]` fallback replies must not wipe timers.
+        if dict[WCConstants.stateTitle] as? String != nil {
+            mainStart = Self.date(fromPlistValue: dict[WCConstants.stateMainStart])
+            tacticalStart = Self.date(fromPlistValue: dict[WCConstants.stateTacticalStart])
         }
         if let arr = dict["titles"] as? [String], !arr.isEmpty {
             titles = arr
         }
+        TimerSnapshotStorage.persist(mainStart: mainStart, tacticalStart: tacticalStart)
+        WatchComplicationKind.reloadTimelines()
+    }
+
+    private static func date(fromPlistValue value: Any?) -> Date? {
+        guard let value else { return nil }
+        if let t = value as? TimeInterval {
+            return Date(timeIntervalSince1970: t)
+        }
+        if let i = value as? Int {
+            return Date(timeIntervalSince1970: TimeInterval(i))
+        }
+        if let n = value as? NSNumber {
+            return Date(timeIntervalSince1970: n.doubleValue)
+        }
+        return nil
     }
 
     func setPickerTitleDebounced(_ title: String) {

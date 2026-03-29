@@ -9,6 +9,7 @@ struct TimeTrackerWatchApp: App {
             WatchContentView()
                 .environmentObject(wc)
                 .preferredColorScheme(.dark)
+                .onOpenURL { _ in }
         }
     }
 }

@@ -23,6 +23,11 @@ enum AppTheme {
     static var surfaceGap: Color {
         secondary.opacity(0.3)
     }
+
+    #if os(watchOS)
+    /// Tactical line color for WidgetKit complications (legible on watch faces).
+    static let complicationTacticalPink = Color(hsl: 330, 70, 68)
+    #endif
 }
 
 extension Color {

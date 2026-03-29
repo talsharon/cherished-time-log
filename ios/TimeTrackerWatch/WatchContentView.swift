@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WatchContentView: View {
     @EnvironmentObject private var wc: WatchConnectivityModel
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -84,6 +85,11 @@ struct WatchContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppTheme.background)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                WatchComplicationKind.reloadTimelines()
+            }
+        }
     }
 
 }
