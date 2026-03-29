@@ -4,9 +4,10 @@ import WidgetKit
 enum WatchComplicationKind {
     static let rectangularTimer = "TimeTrackerRectangularTimer"
     static let tacticalTimer = "TimeTrackerCornerTimer"
+    static let categoryTitleCircular = "TimeTrackerCategoryTitle"
 
     private static var all: [String] {
-        [rectangularTimer, tacticalTimer]
+        [rectangularTimer, tacticalTimer, categoryTitleCircular]
     }
 
     /// Ask WidgetKit to reload timelines after App Group snapshot changes.

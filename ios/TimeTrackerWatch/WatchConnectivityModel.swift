@@ -42,7 +42,7 @@ final class WatchConnectivityModel: NSObject, ObservableObject {
         if let arr = dict["titles"] as? [String], !arr.isEmpty {
             titles = arr
         }
-        TimerSnapshotStorage.persist(mainStart: mainStart, tacticalStart: tacticalStart)
+        TimerSnapshotStorage.persist(mainStart: mainStart, tacticalStart: tacticalStart, currentTitle: currentTitle)
         WatchComplicationKind.reloadTimelines()
     }
 
