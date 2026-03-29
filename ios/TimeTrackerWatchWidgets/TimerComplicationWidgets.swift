@@ -3,47 +3,65 @@ import WidgetKit
 
 struct TimerEntry: TimelineEntry {
     let date: Date
-    let mainText: String
-    let tacticalCompact: String
+    let mainStart: Date?
+    let tacticalStart: Date?
+}
+
+/// Upper bound for `Text(timerInterval:)` so the interval stays open-ended for a running stopwatch.
+private func stopwatchInterval(from start: Date) -> ClosedRange<Date> {
+    let end = Calendar.current.date(byAdding: .year, value: 10, to: start) ?? start.addingTimeInterval(3600 * 24 * 365)
+    return start...end
+}
+
+private enum TimerTimelineConstants {
+    static let reloadMinutes = 30
 }
 
 struct TimerTimelineProvider: TimelineProvider {
     func placeholder(in context: Context) -> TimerEntry {
-        TimerEntry(date: .now, mainText: "00:00:00", tacticalCompact: "00:00")
+        TimerEntry(date: .now, mainStart: nil, tacticalStart: nil)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (TimerEntry) -> Void) {
-        completion(makeEntry(for: Date()))
+        let (m, t, _) = TimerSnapshotStorage.load()
+        completion(TimerEntry(date: Date(), mainStart: m, tacticalStart: t))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<TimerEntry>) -> Void) {
-        let (mainStart, tacticalStart) = TimerSnapshotStorage.load()
+        let (mainStart, tacticalStart, _) = TimerSnapshotStorage.load()
         let now = Date()
-        var entries: [TimerEntry] = []
-        for i in 0 ..< 60 {
-            guard let d = Calendar.current.date(byAdding: .second, value: i, to: now) else { continue }
-            entries.append(makeEntry(at: d, mainStart: mainStart, tacticalStart: tacticalStart))
-        }
-        if entries.isEmpty {
-            entries.append(makeEntry(at: now, mainStart: mainStart, tacticalStart: tacticalStart))
-        }
-        let policy = TimelineReloadPolicy.after(entries.last!.date.addingTimeInterval(1))
-        completion(Timeline(entries: entries, policy: policy))
+        let entry = TimerEntry(date: now, mainStart: mainStart, tacticalStart: tacticalStart)
+        let reloadDate = Calendar.current.date(byAdding: .minute, value: TimerTimelineConstants.reloadMinutes, to: now)
+            ?? now.addingTimeInterval(TimeInterval(TimerTimelineConstants.reloadMinutes * 60))
+        let policy = TimelineReloadPolicy.after(reloadDate)
+        completion(Timeline(entries: [entry], policy: policy))
+    }
+}
+
+// MARK: - Category title (small circular)
+
+struct CategoryTitleEntry: TimelineEntry {
+    let date: Date
+    let title: String
+}
+
+struct CategoryTitleTimelineProvider: TimelineProvider {
+    func placeholder(in context: Context) -> CategoryTitleEntry {
+        CategoryTitleEntry(date: .now, title: "Idle")
     }
 
-    private func makeEntry(for date: Date) -> TimerEntry {
-        let (m, t) = TimerSnapshotStorage.load()
-        return makeEntry(at: date, mainStart: m, tacticalStart: t)
+    func getSnapshot(in context: Context, completion: @escaping (CategoryTitleEntry) -> Void) {
+        let (_, _, title) = TimerSnapshotStorage.load()
+        completion(CategoryTitleEntry(date: Date(), title: title))
     }
 
-    private func makeEntry(at date: Date, mainStart: Date?, tacticalStart: Date?) -> TimerEntry {
-        let tacRef = tacticalStart ?? mainStart
-        let mainSec = mainStart.map { max(0, Int(date.timeIntervalSince($0))) }
-        let tacSec = tacRef.map { max(0, Int(date.timeIntervalSince($0))) }
-
-        let mainText = mainSec.map { StopwatchFormat.hms(totalSeconds: $0) } ?? "--:--:--"
-        let tacticalCompact = tacSec.map { StopwatchFormat.mmssCompact(totalSeconds: $0) } ?? "--:--"
-        return TimerEntry(date: date, mainText: mainText, tacticalCompact: tacticalCompact)
+    func getTimeline(in context: Context, completion: @escaping (Timeline<CategoryTitleEntry>) -> Void) {
+        let (_, _, title) = TimerSnapshotStorage.load()
+        let now = Date()
+        let entry = CategoryTitleEntry(date: now, title: title)
+        let reloadDate = Calendar.current.date(byAdding: .minute, value: TimerTimelineConstants.reloadMinutes, to: now)
+            ?? now.addingTimeInterval(TimeInterval(TimerTimelineConstants.reloadMinutes * 60))
+        completion(Timeline(entries: [entry], policy: TimelineReloadPolicy.after(reloadDate)))
     }
 }
 
@@ -54,18 +72,35 @@ struct RectangularTimerView: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 4) {
-            Text(entry.mainText)
-                .font(.system(.title3, design: .monospaced))
-                .fontWeight(.semibold)
-                .foregroundStyle(.white)
-                .minimumScaleFactor(0.5)
-                .lineLimit(1)
+            if let main = entry.mainStart {
+                Text(timerInterval: stopwatchInterval(from: main), pauseTime: nil, countsDown: false)
+                    .font(.system(.title3, design: .monospaced))
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+            } else {
+                Text("--:--:--")
+                    .font(.system(.title3, design: .monospaced))
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+            }
             Spacer(minLength: 0)
-            Text(entry.tacticalCompact)
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundStyle(AppTheme.complicationTacticalPink)
-                .minimumScaleFactor(0.65)
-                .lineLimit(1)
+            if let tac = entry.tacticalStart ?? entry.mainStart {
+                Text(timerInterval: stopwatchInterval(from: tac), pauseTime: nil, countsDown: false)
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(AppTheme.complicationTacticalPink)
+                    .minimumScaleFactor(0.65)
+                    .lineLimit(1)
+            } else {
+                Text("--:--")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(AppTheme.complicationTacticalPink)
+                    .minimumScaleFactor(0.65)
+                    .lineLimit(1)
+            }
         }
         .widgetURL(widgetOpenURL)
     }
@@ -95,12 +130,38 @@ struct CornerTimerView: View {
     }
 
     var body: some View {
-        Text(entry.tacticalCompact)
-            .font(tacticalFont)
-            .fontWeight(.medium)
-            .foregroundStyle(AppTheme.complicationTacticalPink)
-            .minimumScaleFactor(minimumTacticalScale)
-            .lineLimit(1)
+        Group {
+            if let tac = entry.tacticalStart ?? entry.mainStart {
+                Text(timerInterval: stopwatchInterval(from: tac), pauseTime: nil, countsDown: false)
+                    .font(tacticalFont)
+                    .fontWeight(.medium)
+                    .foregroundStyle(AppTheme.complicationTacticalPink)
+                    .minimumScaleFactor(minimumTacticalScale)
+                    .lineLimit(1)
+            } else {
+                Text("--:--")
+                    .font(tacticalFont)
+                    .fontWeight(.medium)
+                    .foregroundStyle(AppTheme.complicationTacticalPink)
+                    .minimumScaleFactor(minimumTacticalScale)
+                    .lineLimit(1)
+            }
+        }
+        .widgetURL(widgetOpenURL)
+    }
+}
+
+struct CategoryTitleCircularView: View {
+    var entry: CategoryTitleEntry
+
+    var body: some View {
+        Text(entry.title)
+            .font(.system(.caption, design: .rounded))
+            .fontWeight(.semibold)
+            .foregroundStyle(.primary)
+            .multilineTextAlignment(.center)
+            .minimumScaleFactor(0.35)
+            .lineLimit(3)
             .widgetURL(widgetOpenURL)
     }
 }
@@ -137,10 +198,25 @@ struct CornerTimerWidget: Widget {
     }
 }
 
+struct CategoryTitleWidget: Widget {
+    let kind: String = WatchComplicationKind.categoryTitleCircular
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: CategoryTitleTimelineProvider()) { entry in
+            CategoryTitleCircularView(entry: entry)
+                .containerBackground(.clear, for: .widget)
+        }
+        .supportedFamilies([.accessoryCircular])
+        .configurationDisplayName("Category")
+        .description("Current session category title.")
+    }
+}
+
 @main
 struct TimeTrackerWatchWidgetsBundle: WidgetBundle {
     var body: some Widget {
         RectangularTimerWidget()
         CornerTimerWidget()
+        CategoryTitleWidget()
     }
 }
