@@ -39,10 +39,16 @@ final class WatchConnectivityModel: NSObject, ObservableObject {
             mainStart = Self.date(fromPlistValue: dict[WCConstants.stateMainStart])
             tacticalStart = Self.date(fromPlistValue: dict[WCConstants.stateTacticalStart])
         }
+        let currentTitleColor = (dict[WCConstants.stateTitleColor] as? String) ?? "hsl(0, 0%, 55%)"
         if let arr = dict["titles"] as? [String], !arr.isEmpty {
             titles = arr
         }
-        TimerSnapshotStorage.persist(mainStart: mainStart, tacticalStart: tacticalStart, currentTitle: currentTitle)
+        TimerSnapshotStorage.persist(
+            mainStart: mainStart,
+            tacticalStart: tacticalStart,
+            currentTitle: currentTitle,
+            currentTitleColor: currentTitleColor
+        )
         WatchComplicationKind.reloadTimelines()
     }
 

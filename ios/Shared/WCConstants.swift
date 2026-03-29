@@ -11,6 +11,7 @@ enum WCConstants {
     static let actionUpdateTitle = "updateTitle"
 
     static let stateTitle = "currentTitle"
+    static let stateTitleColor = "currentTitleColor"
     static let stateMainStart = "mainStart"
     static let stateTacticalStart = "tacticalStart"
 }

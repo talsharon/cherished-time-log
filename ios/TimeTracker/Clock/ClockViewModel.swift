@@ -180,8 +180,10 @@ final class ClockViewModel: ObservableObject, WatchCommandHandler {
     }
 
     func snapshotForWatch() -> [String: Any] {
+        let currentTitleColor = titles.first(where: { $0.name == currentTitle })?.color ?? "hsl(0, 0%, 55%)"
         var d: [String: Any] = [
             WCConstants.stateTitle: currentTitle,
+            WCConstants.stateTitleColor: currentTitleColor,
         ]
         if let s = startTime {
             d[WCConstants.stateMainStart] = s.timeIntervalSince1970
