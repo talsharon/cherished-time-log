@@ -27,17 +27,19 @@ struct WatchContentView: View {
                     }
                 }
 
-                Text(wc.currentTitle)
-                    .font(.headline)
-                    .foregroundStyle(AppTheme.foreground)
-                    .multilineTextAlignment(.center)
-
                 Picker("Title", selection: Binding(
                     get: { wc.currentTitle },
                     set: { wc.send(WCConstants.actionUpdateTitle, title: $0) }
                 )) {
-                    ForEach(wc.titles, id: \.self) { Text($0).tag($0) }
+                    ForEach(wc.titles, id: \.self) { title in
+                        Text(title)
+                            .font(.caption)
+                            .tag(title)
+                    }
                 }
+                .pickerStyle(.wheel)
+                .frame(height: 38)
+                .clipped()
                 .labelsHidden()
                 .tint(AppTheme.accent)
 
