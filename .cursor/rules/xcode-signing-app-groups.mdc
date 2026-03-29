@@ -1,0 +1,12 @@
+---
+description: Preserve DEVELOPMENT_TEAM and App Group entitlements; XcodeGen source of truth
+globs: ios/project.yml,ios/**/*.entitlements,ios/Config/*.xcconfig
+alwaysApply: false
+---
+
+# Xcode signing and App Groups
+
+- **Do not remove** `DEVELOPMENT_TEAM` from [`ios/Config/Base.xcconfig`](ios/Config/Base.xcconfig). If the user’s Apple team changes, update that value there (not only in `project.pbxproj`).
+- **App Groups source of truth:** [`ios/project.yml`](ios/project.yml) — each app target’s `entitlements.properties` must keep `com.apple.security.application-groups: [group.com.talsharon.TimeTracker]`. XcodeGen **rewrites** the `.entitlements` plists on `xcodegen generate`; without `properties`, those files can become empty and the capability vanishes in Xcode.
+- **Do not remove** the `entitlements:` block (`path` + `properties`) for **TimeTracker**, **TimeTrackerWatch**, or **TimeTrackerWatchWidgets**.
+- After editing **`project.yml`**, run `xcodegen generate` from `ios/`; signing comes from **xcconfig**, groups from **yml-driven entitlements**, not hand-edits to `TimeTracker.xcodeproj/project.pbxproj`.

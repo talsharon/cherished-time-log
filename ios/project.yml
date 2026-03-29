@@ -20,7 +20,13 @@ targets:
       - path: TimeTracker
         excludes:
           - Info.plist
+          - "*.entitlements"
       - path: Shared
+    entitlements:
+      path: TimeTracker/TimeTracker.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.talsharon.TimeTracker
     dependencies:
       - package: Supabase
         product: Supabase
@@ -47,9 +53,13 @@ targets:
       - path: TimeTrackerWatch
         excludes:
           - Info.plist
+          - "*.entitlements"
       - path: Shared
     entitlements:
       path: TimeTrackerWatch/TimeTrackerWatch.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.talsharon.TimeTracker
     dependencies:
       - target: TimeTrackerWatchWidgets
         embed: true
@@ -78,6 +88,9 @@ targets:
       - path: Shared
     entitlements:
       path: TimeTrackerWatchWidgets/TimeTrackerWatchWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.talsharon.TimeTracker
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.talsharon.TimeTracker.watchkitapp.widgets
