@@ -1,0 +1,14 @@
+---
+description: In Plan mode, never modify the project or run mutating commands
+alwaysApply: true
+---
+
+# Plan mode — no execution
+
+When the conversation is in **Plan mode** (or the system says planning is active and execution is forbidden):
+
+1. **Do not** edit files, create/delete files, run `git` that changes history or the index, install packages, or run **any** shell command whose purpose is to change the workspace (including one-liners that patch files via `python`, `sed`, `perl`, etc.).
+2. **Do** use read-only exploration: read/search files, answer questions, and produce plans. Use Cursor’s planning flow and wait for the user to **exit Plan mode** or **explicitly ask you to implement** before changing anything.
+3. If the user’s message could mean either “put this in the plan” or “do it now,” assume **plan iteration** and **do not execute** until they clearly ask to implement.
+
+**If not in Plan mode:** Normal agent behavior applies once Plan mode is off and the user asks to implement.

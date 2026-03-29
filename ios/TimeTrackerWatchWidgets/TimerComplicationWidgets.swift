@@ -189,22 +189,19 @@ struct CategoryTitleCircularView: View {
         Color(cssColor: entry.titleColor) ?? AppTheme.accent
     }
 
-    private var inactiveNotchColor: Color {
-        Color.primary.opacity(0.2)
-    }
-
     var body: some View {
         GeometryReader { proxy in
             let size = min(proxy.size.width, proxy.size.height)
             let ringInset = size * 0.1
             let radius = (size / 2) - ringInset
-            let lineWidth = max(2, size * 0.08)
+            let lineWidth = max(2, size * 0.055)
             let filled = categoryFilledNotchCount(at: entry.date, mainStart: entry.mainStart)
-            let segmentSweep = 26.0
+            let slotDegrees = 360.0 / Double(TimerTimelineConstants.notchCount)
+            let segmentSweep = 16.0
 
             ZStack {
-                ForEach(0..<TimerTimelineConstants.notchCount, id: \.self) { index in
-                    let startAngle = Angle(degrees: -90 + (Double(index) * (360.0 / Double(TimerTimelineConstants.notchCount))))
+                ForEach(0..<filled, id: \.self) { index in
+                    let startAngle = Angle(degrees: -90 + (Double(index) * slotDegrees))
                     let endAngle = Angle(degrees: startAngle.degrees + segmentSweep)
                     Path { path in
                         path.addArc(
@@ -215,7 +212,7 @@ struct CategoryTitleCircularView: View {
                             clockwise: false
                         )
                     }
-                    .stroke(index < filled ? activeNotchColor : inactiveNotchColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .stroke(activeNotchColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
                 }
 
                 Text(entry.title)
