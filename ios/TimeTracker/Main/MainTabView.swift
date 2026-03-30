@@ -75,6 +75,9 @@ struct MainTabView: View {
                 _ = await (clockLoad, logsLoad, insightsLoad)
             }
         }
+        .task(id: api.userId) {
+            await clockVM.loadCommentAutocompleteCorpusIfNeeded()
+        }
     }
 
     private var shellHeader: some View {

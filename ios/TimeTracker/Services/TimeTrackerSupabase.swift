@@ -68,6 +68,17 @@ final class TimeTrackerSupabase: ObservableObject {
             .value
     }
 
+    func fetchRecentLogs(userId: UUID, limit: Int) async throws -> [LogRow] {
+        try await client
+            .from("logs")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .order("start_time", ascending: false)
+            .limit(limit)
+            .execute()
+            .value
+    }
+
     func insertLog(userId: UUID, startTime: Date, duration: Int, title: String, comment: String?) async throws {
         let row = LogInsert(
             userId: userId,

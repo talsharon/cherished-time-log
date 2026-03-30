@@ -17,6 +17,9 @@ final class ClockViewModel: ObservableObject, WatchCommandHandler {
     @Published var logs: [LogRow] = []
     @Published var titles: [TitleRow] = []
     @Published var isGeneratingInsights = false
+    @Published private(set) var commentAutocompletePhrases: [String] = []
+
+    private var didLoadCommentAutocompleteCorpus = false
 
     init(api: TimeTrackerSupabase, insightsBaseURL: URL) {
         self.api = api
@@ -44,6 +47,28 @@ final class ClockViewModel: ObservableObject, WatchCommandHandler {
         }
         sessionLoading = false
         syncWatchContext()
+    }
+
+    /// Loads unique past comments from the 500 most recent logs once per view-model lifetime (not refreshed on `load()` or foreground).
+    func loadCommentAutocompleteCorpusIfNeeded() async {
+        guard let uid = api.userId else { return }
+        guard !didLoadCommentAutocompleteCorpus else { return }
+        didLoadCommentAutocompleteCorpus = true
+        do {
+            let rows = try await api.fetchRecentLogs(userId: uid, limit: 500)
+            var seenLower = Set<String>()
+            var phrases: [String] = []
+            for log in rows {
+                guard let raw = log.comment?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { continue }
+                let key = raw.lowercased()
+                if seenLower.insert(key).inserted {
+                    phrases.append(raw)
+                }
+            }
+            commentAutocompletePhrases = phrases
+        } catch {
+            commentAutocompletePhrases = []
+        }
     }
 
     func updateTitle(_ name: String) async {

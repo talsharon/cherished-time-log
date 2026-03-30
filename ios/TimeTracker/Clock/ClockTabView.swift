@@ -8,6 +8,8 @@ struct ClockTabView: View {
         return f
     }()
 
+    private static let commentAutocompleteMaxRows = 10
+
     @ObservedObject var viewModel: ClockViewModel
     @FocusState private var commentFocused: Bool
     @State private var newTitleSheet = false
@@ -249,12 +251,47 @@ struct ClockTabView: View {
                             .stroke(AppTheme.border.opacity(0.8), lineWidth: 1)
                     )
 
-                    TextField("Add a comment…", text: $viewModel.currentComment)
-                        .textFieldStyle(ThemedTextFieldStyle())
-                        .focused($commentFocused)
-                        .onChange(of: viewModel.currentComment) { _, new in
-                            Task { await viewModel.updateComment(new) }
+                    VStack(alignment: .leading, spacing: 6) {
+                        TextField("Add a comment…", text: $viewModel.currentComment)
+                            .textFieldStyle(ThemedTextFieldStyle())
+                            .focused($commentFocused)
+                            .onChange(of: viewModel.currentComment) { _, new in
+                                Task { await viewModel.updateComment(new) }
+                            }
+
+                        if commentFocused && !commentAutocompleteQuery.isEmpty && !commentAutocompleteMatches.isEmpty {
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    ForEach(Array(commentAutocompleteMatches.enumerated()), id: \.offset) { index, phrase in
+                                        Button {
+                                            viewModel.currentComment = phrase
+                                            commentFocused = false
+                                        } label: {
+                                            Text(phrase)
+                                                .font(.subheadline)
+                                                .foregroundStyle(AppTheme.foreground)
+                                                .multilineTextAlignment(.leading)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 10)
+                                        }
+                                        .buttonStyle(.plain)
+                                        if index < commentAutocompleteMatches.count - 1 {
+                                            Divider()
+                                                .background(AppTheme.border.opacity(0.8))
+                                        }
+                                    }
+                                }
+                            }
+                            .frame(maxHeight: 220)
+                            .background(AppTheme.secondary.opacity(0.6))
+                            .clipShape(RoundedRectangle(cornerRadius: AppTheme.radiusCard, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: AppTheme.radiusCard, style: .continuous)
+                                    .stroke(AppTheme.border.opacity(0.8), lineWidth: 1)
+                            )
                         }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
@@ -297,6 +334,19 @@ struct ClockTabView: View {
         let q = activitySearch.trimmingCharacters(in: .whitespacesAndNewlines)
         if q.isEmpty { return sortedActivityTitles }
         return sortedActivityTitles.filter { $0.name.localizedCaseInsensitiveContains(q) }
+    }
+
+    private var commentAutocompleteQuery: String {
+        viewModel.currentComment.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var commentAutocompleteMatches: [String] {
+        let q = commentAutocompleteQuery
+        guard !q.isEmpty else { return [] }
+        return viewModel.commentAutocompletePhrases
+            .filter { $0.localizedCaseInsensitiveContains(q) }
+            .prefix(Self.commentAutocompleteMaxRows)
+            .map { $0 }
     }
 
     private var tacticalBlock: some View {
