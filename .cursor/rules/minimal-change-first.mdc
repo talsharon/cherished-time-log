@@ -1,0 +1,12 @@
+---
+description: Prefer minimal, localized changes before broader refactors
+alwaysApply: true
+---
+
+# Minimal change first
+
+1. Prefer the smallest, localized change that fully satisfies the request.
+2. Preserve existing behavior and update mechanisms unless the user explicitly asks for behavioral changes.
+3. For display-only requests, do not alter data flow, timeline logic, refresh behavior, or architecture.
+4. Only propose or implement larger refactors when the user explicitly asks for architecture-level improvements.
+5. If a broader change could introduce regression risk, call out the risk and default to the minimal safe option.
