@@ -12,6 +12,8 @@ struct ClockTabView: View {
     @FocusState private var commentFocused: Bool
     @State private var newTitleSheet = false
     @State private var newTitleText = ""
+    @State private var activityPickerSheet = false
+    @State private var activitySearch = ""
     @State private var startTimeSheet = false
     @State private var editStart = Date()
 
@@ -92,6 +94,68 @@ struct ClockTabView: View {
             .presentationDetents([.medium])
             .preferredColorScheme(.dark)
         }
+        .sheet(isPresented: $activityPickerSheet, onDismiss: { activitySearch = "" }) {
+            NavigationStack {
+                VStack(spacing: 0) {
+                    TextField("Search", text: $activitySearch)
+                        .textFieldStyle(ThemedTextFieldStyle())
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                    List {
+                        Button {
+                            activityPickerSheet = false
+                            activitySearch = ""
+                            newTitleSheet = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.body)
+                                    .foregroundStyle(AppTheme.accent)
+                                Text("Create new…")
+                                    .foregroundStyle(AppTheme.foreground)
+                            }
+                        }
+                        ForEach(filteredActivityTitles, id: \.id) { t in
+                            Button {
+                                Task {
+                                    await viewModel.updateTitle(t.name)
+                                    activityPickerSheet = false
+                                    activitySearch = ""
+                                }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(uiImage: TitleDotUIImage.dotImage(color: viewModel.color(for: t.name)))
+                                        .renderingMode(.original)
+                                        .resizable()
+                                        .frame(width: 10, height: 10)
+                                    Text(t.name)
+                                        .foregroundStyle(AppTheme.foreground)
+                                }
+                            }
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .background(AppTheme.background)
+                }
+                .background(AppTheme.background)
+                .navigationTitle("Activity")
+                .navigationBarTitleDisplayMode(.inline)
+                .foregroundStyle(AppTheme.foreground)
+                .toolbarBackground(AppTheme.background, for: .navigationBar)
+                .toolbarColorScheme(.dark, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            activityPickerSheet = false
+                            activitySearch = ""
+                        }
+                        .foregroundStyle(AppTheme.textMuted)
+                    }
+                }
+            }
+            .preferredColorScheme(.dark)
+        }
         .sheet(isPresented: $startTimeSheet) {
             NavigationStack {
                 Form {
@@ -156,25 +220,8 @@ struct ClockTabView: View {
                         .font(.body)
                         .foregroundStyle(AppTheme.textMuted)
 
-                    Menu {
-                        Button("Create new…") {
-                            newTitleSheet = true
-                        }
-                        ForEach(sortedActivityTitles, id: \.id) { t in
-                            Button {
-                                Task { await viewModel.updateTitle(t.name) }
-                            } label: {
-                                Label {
-                                    Text(t.name)
-                                } icon: {
-                                    Image(uiImage: TitleDotUIImage.dotImage(color: viewModel.color(for: t.name)))
-                                        .renderingMode(.original)
-                                        .resizable()
-                                        .frame(width: 10, height: 10)
-                                }
-                            }
-                            .labelStyle(.titleAndIcon)
-                        }
+                    Button {
+                        activityPickerSheet = true
                     } label: {
                         HStack(spacing: 10) {
                             Circle()
@@ -190,6 +237,7 @@ struct ClockTabView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                     .accessibilityLabel("Activity, \(viewModel.currentTitle)")
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
@@ -243,6 +291,12 @@ struct ClockTabView: View {
             if b.name == "Idle" { return false }
             return a.name < b.name
         })
+    }
+
+    private var filteredActivityTitles: [TitleRow] {
+        let q = activitySearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        if q.isEmpty { return sortedActivityTitles }
+        return sortedActivityTitles.filter { $0.name.localizedCaseInsensitiveContains(q) }
     }
 
     private var tacticalBlock: some View {
