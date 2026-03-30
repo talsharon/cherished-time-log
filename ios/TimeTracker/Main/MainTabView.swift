@@ -21,11 +21,13 @@ private enum ShellTab: Int, CaseIterable {
 }
 
 struct MainTabView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var api: TimeTrackerSupabase
     @StateObject private var clockVM: ClockViewModel
     @StateObject private var logsVM: LogsViewModel
     @StateObject private var insightsVM: InsightsViewModel
     @State private var tab: ShellTab = .clock
+    @State private var hasCompletedInitialActivation = false
 
     init(api: TimeTrackerSupabase) {
         self.api = api
@@ -59,6 +61,20 @@ struct MainTabView: View {
         .background(AppTheme.background.ignoresSafeArea())
         .tint(AppTheme.accent)
         .ignoresSafeArea(.keyboard, edges: .bottom)
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            guard newPhase == .active else { return }
+            if !hasCompletedInitialActivation {
+                hasCompletedInitialActivation = true
+                return
+            }
+            guard oldPhase == .background || oldPhase == .inactive else { return }
+            Task {
+                async let clockLoad: Void = clockVM.load()
+                async let logsLoad: Void = logsVM.load()
+                async let insightsLoad: Void = insightsVM.load()
+                _ = await (clockLoad, logsLoad, insightsLoad)
+            }
+        }
     }
 
     private var shellHeader: some View {
