@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ClockTabView: View {
     private static let sessionStartTimeFormatter: DateFormatter = {
@@ -12,10 +13,10 @@ struct ClockTabView: View {
 
     @ObservedObject var viewModel: ClockViewModel
     @FocusState private var commentFocused: Bool
-    @State private var newTitleSheet = false
-    @State private var newTitleText = ""
     @State private var activityPickerSheet = false
     @State private var activitySearch = ""
+    /// New `.id` each time the user opens the activity sheet so the UIKit search field re-runs auto-focus.
+    @State private var activitySearchFieldID = UUID()
     @State private var startTimeSheet = false
     @State private var editStart = Date()
 
@@ -63,60 +64,46 @@ struct ClockTabView: View {
             PhoneSessionManager.shared.commandHandler = viewModel
             await viewModel.load()
         }
-        .sheet(isPresented: $newTitleSheet) {
-            NavigationStack {
-                Form {
-                    TextField("Title", text: $newTitleText)
-                }
-                .scrollContentBackground(.hidden)
-                .background(AppTheme.background)
-                .navigationTitle("New activity")
-                .foregroundStyle(AppTheme.foreground)
-                .toolbarBackground(AppTheme.background, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { newTitleSheet = false }
-                            .foregroundStyle(AppTheme.textMuted)
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Create") {
-                            let t = newTitleText.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !t.isEmpty else { return }
-                            Task {
-                                await viewModel.createTitle(name: t)
-                                newTitleSheet = false
-                                newTitleText = ""
-                            }
-                        }
-                        .foregroundStyle(AppTheme.accent)
-                    }
-                }
-            }
-            .presentationDetents([.medium])
-            .preferredColorScheme(.dark)
-        }
-        .sheet(isPresented: $activityPickerSheet, onDismiss: { activitySearch = "" }) {
+        .sheet(isPresented: $activityPickerSheet, onDismiss: {
+            activitySearch = ""
+        }) {
             NavigationStack {
                 VStack(spacing: 0) {
-                    TextField("Search", text: $activitySearch)
-                        .textFieldStyle(ThemedTextFieldStyle())
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                    List {
-                        Button {
-                            activityPickerSheet = false
-                            activitySearch = ""
-                            newTitleSheet = true
-                        } label: {
-                            HStack(spacing: 10) {
+                    HStack(spacing: 10) {
+                        ActivitySheetSearchField(text: $activitySearch, placeholder: "Search")
+                            .id(activitySearchFieldID)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(height: 40)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(AppTheme.secondary.opacity(0.6))
+                            .clipShape(RoundedRectangle(cornerRadius: AppTheme.radiusCard, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: AppTheme.radiusCard, style: .continuous)
+                                    .stroke(AppTheme.border.opacity(0.8), lineWidth: 1)
+                            )
+                            .accessibilityLabel("Search activities")
+                        if showsActivityCreateButton {
+                            Button {
+                                let t = activitySearchTrimmed
+                                guard !t.isEmpty else { return }
+                                Task {
+                                    await viewModel.createTitle(name: t)
+                                    activityPickerSheet = false
+                                    activitySearch = ""
+                                }
+                            } label: {
                                 Image(systemName: "plus.circle.fill")
-                                    .font(.body)
+                                    .font(.title2)
                                     .foregroundStyle(AppTheme.accent)
-                                Text("Create new…")
-                                    .foregroundStyle(AppTheme.foreground)
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Create new activity")
                         }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    List {
                         ForEach(filteredActivityTitles, id: \.id) { t in
                             Button {
                                 Task {
@@ -223,6 +210,7 @@ struct ClockTabView: View {
                         .foregroundStyle(AppTheme.textMuted)
 
                     Button {
+                        activitySearchFieldID = UUID()
                         activityPickerSheet = true
                     } label: {
                         HStack(spacing: 10) {
@@ -330,8 +318,19 @@ struct ClockTabView: View {
         })
     }
 
+    private var activitySearchTrimmed: String {
+        activitySearch.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Plus creates a new title only when typed text is non-empty and not an exact match to an existing activity name.
+    private var showsActivityCreateButton: Bool {
+        let q = activitySearchTrimmed
+        guard !q.isEmpty else { return false }
+        return !viewModel.titles.contains(where: { $0.name == q })
+    }
+
     private var filteredActivityTitles: [TitleRow] {
-        let q = activitySearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        let q = activitySearchTrimmed
         if q.isEmpty { return sortedActivityTitles }
         return sortedActivityTitles.filter { $0.name.localizedCaseInsensitiveContains(q) }
     }
@@ -391,4 +390,103 @@ struct ClockTabView: View {
         }
     }
 
+}
+
+// MARK: - Activity sheet search (UIKit focus)
+
+/// SwiftUI `@FocusState` is unreliable for `TextField`s inside `.sheet`; use UIKit first responder when the field enters a window.
+private final class WindowAttachedTextField: UITextField {
+    var onDidAttachToWindow: (() -> Void)?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard window != nil else { return }
+        onDidAttachToWindow?()
+    }
+}
+
+private struct ActivitySheetSearchField: UIViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    func makeUIView(context: Context) -> WindowAttachedTextField {
+        let tf = WindowAttachedTextField()
+        tf.delegate = context.coordinator
+        tf.placeholder = placeholder
+        tf.text = text
+        tf.autocorrectionType = .default
+        tf.autocapitalizationType = .sentences
+        tf.returnKeyType = .search
+        tf.clearButtonMode = .whileEditing
+        tf.borderStyle = .none
+        tf.backgroundColor = .clear
+        tf.textColor = .label
+        tf.font = UIFont.preferredFont(forTextStyle: .body)
+        tf.adjustsFontForContentSizeCategory = true
+        tf.contentVerticalAlignment = .center
+        tf.setContentHuggingPriority(.required, for: .vertical)
+        tf.setContentCompressionResistancePriority(.required, for: .vertical)
+        tf.tintColor = UIColor(red: 46 / 255, green: 158 / 255, blue: 92 / 255, alpha: 1)
+        tf.addTarget(context.coordinator, action: #selector(Coordinator.editingChanged(_:)), for: .editingChanged)
+
+        let coordinator = context.coordinator
+        tf.onDidAttachToWindow = { [weak tf] in
+            guard let tf else { return }
+            coordinator.scheduleBecomeFirstResponder(on: tf)
+        }
+        return tf
+    }
+
+    func updateUIView(_ uiView: WindowAttachedTextField, context: Context) {
+        context.coordinator.parent = self
+        if uiView.text != text {
+            uiView.text = text
+        }
+        if uiView.placeholder != placeholder {
+            uiView.placeholder = placeholder
+        }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: WindowAttachedTextField, context: Context) -> CGSize? {
+        let w = proposal.width ?? UIView.noIntrinsicMetric
+        guard w.isFinite, w > 0 else { return nil }
+        let line = uiView.font?.lineHeight ?? UIFont.preferredFont(forTextStyle: .body).lineHeight
+        let h = ceil(line + 4)
+        return CGSize(width: w, height: h)
+    }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        var parent: ActivitySheetSearchField
+        private var didScheduleKeyboard = false
+
+        init(parent: ActivitySheetSearchField) {
+            self.parent = parent
+        }
+
+        func scheduleBecomeFirstResponder(on tf: UITextField) {
+            guard !didScheduleKeyboard else { return }
+            didScheduleKeyboard = true
+            DispatchQueue.main.async {
+                _ = tf.becomeFirstResponder()
+                DispatchQueue.main.async {
+                    if !tf.isFirstResponder {
+                        _ = tf.becomeFirstResponder()
+                    }
+                }
+            }
+        }
+
+        @objc func editingChanged(_ sender: UITextField) {
+            parent.text = sender.text ?? ""
+        }
+
+        func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+            textField.resignFirstResponder()
+            return true
+        }
+    }
 }
