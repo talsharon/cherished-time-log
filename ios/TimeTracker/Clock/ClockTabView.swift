@@ -26,6 +26,7 @@ struct ClockTabView: View {
                 if viewModel.sessionLoading {
                     ProgressView()
                         .tint(AppTheme.accent)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     content
                 }
@@ -178,7 +179,8 @@ struct ClockTabView: View {
     }
 
     private var content: some View {
-        ScrollView {
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
             VStack(spacing: 20) {
                 if let msg = viewModel.errorMessage {
                     Text(msg)
@@ -305,9 +307,9 @@ struct ClockTabView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 24)
             }
-            .padding(.top, 44)
+            Spacer(minLength: 0)
         }
-        .scrollDismissesKeyboard(.interactively)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var sortedActivityTitles: [TitleRow] {
