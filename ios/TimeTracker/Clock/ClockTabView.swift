@@ -196,9 +196,11 @@ struct ClockTabView: View {
                         Task { await viewModel.resetTactical() }
                     } label: {
                         Image(systemName: "arrow.counterclockwise.circle")
-                            .font(.system(size: 28))
-                            .foregroundStyle(AppTheme.border)
-                            .symbolRenderingMode(.hierarchical)
+                            .font(.system(size: 34))
+                            .foregroundStyle(AppTheme.foreground)
+                            .symbolRenderingMode(.monochrome)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .accessibilityLabel("Reset tactical timer")
                 }
