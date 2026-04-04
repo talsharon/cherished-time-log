@@ -19,7 +19,7 @@ struct WatchContentView: View {
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(AppTheme.textMuted)
                             Button {
-                                wc.send(WCConstants.actionResetTactical)
+                                wc.resetTacticalFromWatch()
                             } label: {
                                 Image(systemName: "arrow.counterclockwise")
                                     .font(.title3.weight(.semibold))
@@ -58,7 +58,7 @@ struct WatchContentView: View {
                 Spacer(minLength: 0)
 
                 Button("DONE") {
-                    wc.send(WCConstants.actionDone)
+                    wc.doneFromWatch()
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(AppTheme.accent)

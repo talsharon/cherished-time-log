@@ -77,6 +77,40 @@ final class WatchConnectivityModel: NSObject, ObservableObject {
         }
     }
 
+    /// Optimistic UI + snapshot; phone reply reconciles via `applyContext`.
+    func resetTacticalFromWatch() {
+        tacticalStart = Date()
+        let titleColor = TimerSnapshotStorage.load().currentTitleColor
+        TimerSnapshotStorage.persist(
+            mainStart: mainStart,
+            tacticalStart: tacticalStart,
+            currentTitle: currentTitle,
+            currentTitleColor: titleColor
+        )
+        WatchComplicationKind.reloadTimelines()
+        send(WCConstants.actionResetTactical)
+    }
+
+    /// Optimistic UI + snapshot; phone reply reconciles via `applyContext`.
+    func doneFromWatch() {
+        titleCommitTask?.cancel()
+        titleCommitTask = nil
+        let now = Date()
+        mainStart = now
+        tacticalStart = now
+        currentTitle = "Idle"
+        pickerTitle = "Idle"
+        let idleTitleColor = "hsl(0, 0%, 55%)"
+        TimerSnapshotStorage.persist(
+            mainStart: mainStart,
+            tacticalStart: tacticalStart,
+            currentTitle: currentTitle,
+            currentTitleColor: idleTitleColor
+        )
+        WatchComplicationKind.reloadTimelines()
+        send(WCConstants.actionDone)
+    }
+
     func send(_ action: String, title: String? = nil) {
         guard WCSession.default.activationState == .activated else { return }
         var msg: [String: Any] = [WCConstants.action: action]
