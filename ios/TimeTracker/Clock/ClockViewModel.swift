@@ -26,9 +26,9 @@ final class ClockViewModel: ObservableObject, WatchCommandHandler {
         insights = InsightsService(baseURL: insightsBaseURL)
     }
 
-    func load() async {
+    func load(silent: Bool = false) async {
         guard let uid = api.userId else { return }
-        sessionLoading = true
+        if !silent { sessionLoading = true }
         errorMessage = nil
         do {
             async let logsTask = api.fetchLogs(userId: uid)

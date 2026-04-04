@@ -69,9 +69,9 @@ struct MainTabView: View {
             }
             guard oldPhase == .background || oldPhase == .inactive else { return }
             Task {
-                async let clockLoad: Void = clockVM.load()
-                async let logsLoad: Void = logsVM.load()
-                async let insightsLoad: Void = insightsVM.load()
+                async let clockLoad: Void = clockVM.load(silent: true)
+                async let logsLoad: Void = logsVM.load(silent: true)
+                async let insightsLoad: Void = insightsVM.load(silent: true)
                 _ = await (clockLoad, logsLoad, insightsLoad)
             }
         }

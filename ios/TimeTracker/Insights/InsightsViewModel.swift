@@ -17,9 +17,9 @@ final class InsightsViewModel: ObservableObject {
         insightsService = InsightsService(baseURL: baseURL)
     }
 
-    func load() async {
+    func load(silent: Bool = false) async {
         guard let uid = api.userId else { return }
-        loading = true
+        if !silent { loading = true }
         errorMessage = nil
         do {
             insights = try await api.fetchWeeklyInsights(userId: uid)
