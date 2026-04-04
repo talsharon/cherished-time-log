@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Time Tracker">
+  <!-- Matches web PWA theme-color and Tailwind primary (~hsl(142 76% 36%)) -->
+  <rect width="1024" height="1024" rx="230" fill="#030712"/>
+  <circle cx="512" cy="512" r="290" fill="none" stroke="#22c55e" stroke-width="56"/>
+  <line x1="512" y1="512" x2="512" y2="290" stroke="#22c55e" stroke-width="52" stroke-linecap="round"/>
+  <line x1="512" y1="512" x2="660" y2="580" stroke="#22c55e" stroke-width="40" stroke-linecap="round"/>
+  <circle cx="512" cy="512" r="36" fill="#22c55e"/>
+</svg>
