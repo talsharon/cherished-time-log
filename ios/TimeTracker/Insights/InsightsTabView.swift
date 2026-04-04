@@ -155,6 +155,15 @@ private struct InsightChartView: View {
         ]
     }
 
+    /// Mirrors web `formatDuration` in InsightsTab (hours floored, minutes rounded).
+    private func formatInsightMinutes(_ minutes: Double) -> String {
+        let hours = Int(minutes / 60)
+        let mins = Int(minutes.truncatingRemainder(dividingBy: 60).rounded())
+        if hours == 0 { return "\(mins)m" }
+        if mins == 0 { return "\(hours)h" }
+        return "\(hours)h \(mins)m"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(graph.title)
@@ -186,6 +195,18 @@ private struct InsightChartView: View {
             )
             .foregroundStyle(accentPalette[i % accentPalette.count])
             .opacity(0.95)
+            .annotation(position: .overlay) {
+                VStack(spacing: 2) {
+                    Text(p.name)
+                        .font(.caption2.weight(.semibold))
+                    Text(formatInsightMinutes(p.value))
+                        .font(.caption2.weight(.medium))
+                }
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.55), radius: 0, x: 0, y: 1)
+                .minimumScaleFactor(0.65)
+            }
         }
     }
 
