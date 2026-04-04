@@ -79,7 +79,6 @@ struct InsightsTabView: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(AppTheme.textMuted)
                 .padding(.horizontal, 28)
-                .environment(\.layoutDirection, .rightToLeft)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -100,8 +99,7 @@ struct InsightsTabView: View {
             Text("\(insight.weekStart) → \(insight.weekEnd)")
                 .font(.caption)
                 .foregroundStyle(AppTheme.textMuted)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .environment(\.layoutDirection, .rightToLeft)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             Text("Summary")
                 .font(.headline)
@@ -139,8 +137,8 @@ struct InsightsTabView: View {
         Text(text)
             .font(.subheadline)
             .foregroundStyle(AppTheme.textMuted)
-            .multilineTextAlignment(.trailing)
-            .frame(maxWidth: .infinity, alignment: .trailing)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -162,8 +160,8 @@ private struct InsightChartView: View {
             Text(graph.title)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppTheme.foreground)
-                .multilineTextAlignment(.trailing)
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             Group {
                 switch graph.type.lowercased() {
