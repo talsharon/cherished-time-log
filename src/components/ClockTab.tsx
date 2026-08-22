@@ -227,7 +227,7 @@ export function ClockTab() {
         <Stopwatch startTime={startTime} onStartTimeClick={handleStartTimeClick} />
       </div>
 
-      <div className="w-full space-y-4 mb-8">
+      <div className="w-full max-w-md space-y-4 mb-8 mx-auto">
         <div className="space-y-2">
           <Label className="text-base font-medium text-muted-foreground">What are you up to?</Label>
           <Select value={currentTitle} onValueChange={handleTitleChange}>
@@ -328,7 +328,7 @@ export function ClockTab() {
         </DialogContent>
       </Dialog>
 
-      <div className="w-full">
+      <div className="w-full max-w-md mx-auto">
         <Button
           onClick={handleDone}
           disabled={isSaving || !startTime || isCommentFocused}
