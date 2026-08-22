@@ -40,7 +40,7 @@ export function Stopwatch({ startTime, onStartTimeClick }: StopwatchProps) {
 
   return (
     <div className="flex flex-col items-center justify-center">
-      <div className="font-mono text-7xl font-light tracking-tight text-foreground tabular-nums">
+      <div className="font-mono text-7xl md:text-8xl lg:text-9xl font-light tracking-tight text-foreground tabular-nums">
         {formatTime(elapsed)}
       </div>
       {startTime ? (
