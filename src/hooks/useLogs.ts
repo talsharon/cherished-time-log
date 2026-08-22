@@ -41,6 +41,26 @@ export function useLogs() {
     fetchLogs();
   }, [fetchLogs]);
 
+  // Refresh when the tab becomes visible / focused so logs created on
+  // another device show up without a reload.
+  useEffect(() => {
+    if (!user) return;
+
+    const onVisibility = () => {
+      if (!document.hidden) void fetchLogs();
+    };
+    const onFocus = () => { void fetchLogs(); };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [user, fetchLogs]);
+
+
   const createLog = useCallback(async (startTime: Date, duration: number, title: string = 'Idle', comment?: string) => {
     if (!user) return;
 
