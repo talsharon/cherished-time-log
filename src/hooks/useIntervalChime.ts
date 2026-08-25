@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { playChime, unlockAudio } from '@/lib/chime';
 
 const STORAGE_KEY = 'timetracker.chime';
@@ -39,7 +39,10 @@ function readSettings(): ChimeSettings {
 
 export function useIntervalChime() {
   const [settings, setSettings] = useState<ChimeSettings>(readSettings);
+  const [secondsRemaining, setSecondsRemaining] = useState(0);
+  const nextFireAtRef = useRef<number | null>(null);
 
+  // Persist settings to localStorage.
   useEffect(() => {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -48,11 +51,32 @@ export function useIntervalChime() {
     }
   }, [settings]);
 
+  // Arm / disarm the next fire time when enabled or interval changes.
+  useEffect(() => {
+    if (!settings.enabled) {
+      nextFireAtRef.current = null;
+      setSecondsRemaining(0);
+      return;
+    }
+    nextFireAtRef.current = Date.now() + settings.intervalMinutes * 60_000;
+    setSecondsRemaining(settings.intervalMinutes * 60);
+  }, [settings.enabled, settings.intervalMinutes]);
+
+  // Single 1-second ticker: drives the countdown and fires the chime.
   useEffect(() => {
     if (!settings.enabled) return;
     const id = window.setInterval(() => {
-      playChime();
-    }, settings.intervalMinutes * 60_000);
+      const next = nextFireAtRef.current;
+      if (next == null) return;
+      const now = Date.now();
+      if (now >= next) {
+        playChime();
+        nextFireAtRef.current = Date.now() + settings.intervalMinutes * 60_000;
+        setSecondsRemaining(settings.intervalMinutes * 60);
+      } else {
+        setSecondsRemaining(Math.max(0, Math.round((next - now) / 1000)));
+      }
+    }, 1000);
     return () => window.clearInterval(id);
   }, [settings.enabled, settings.intervalMinutes]);
 
@@ -75,6 +99,7 @@ export function useIntervalChime() {
   return {
     enabled: settings.enabled,
     intervalMinutes: settings.intervalMinutes,
+    secondsRemaining,
     setEnabled,
     setIntervalMinutes,
     playChime: test,
