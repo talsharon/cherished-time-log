@@ -14,8 +14,24 @@ clientsClaim();
 self.skipWaiting();
 cleanupOutdatedCaches();
 
-// Inject Workbox precache manifest
+// Inject Workbox precache manifest for hashed assets
 precacheAndRoute(self.__WB_MANIFEST);
+
+// Navigation requests (HTML): always try network first so a refresh picks up
+// the latest build, falling back to cache when offline.
+registerRoute(
+  ({ request }) => request.mode === "navigate",
+  new NetworkFirst({
+    cacheName: "pages-cache",
+    networkTimeoutSeconds: 5,
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 10,
+        maxAgeSeconds: 60 * 60 * 24, // 24 hours
+      }),
+    ],
+  })
+);
 
 // Runtime cache: Supabase API requests
 registerRoute(
