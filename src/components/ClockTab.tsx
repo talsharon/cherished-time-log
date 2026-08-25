@@ -194,7 +194,7 @@ export function ClockTab() {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="clock-layout relative flex min-h-full w-full flex-col items-center px-6 py-4">
+      <div className="clock-layout relative flex min-h-full w-full flex-col items-center px-6 py-4 [@media(max-height:640px)]:py-2">
       {/* Generate Insights Button */}
       <Button
         variant="ghost"
