@@ -194,7 +194,7 @@ export function ClockTab() {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="clock-layout relative flex min-h-full w-full flex-col items-center justify-center px-6 py-4">
+      <div className="clock-layout relative flex min-h-full w-full flex-col items-center px-6 py-4">
       {/* Generate Insights Button */}
       <Button
         variant="ghost"
@@ -212,7 +212,7 @@ export function ClockTab() {
       </Button>
 
       {/* Chime countdown + toggle */}
-      <div className="flex items-center justify-center mb-[var(--clock-gap-compact)]">
+      <div className="mt-auto flex items-center justify-center mb-[var(--clock-gap-compact)]">
         <ChimeCountdown />
       </div>
 
@@ -335,7 +335,7 @@ export function ClockTab() {
         </DialogContent>
       </Dialog>
 
-      <div className="w-full max-w-md">
+      <div className="mb-auto w-full max-w-md">
         <Button
           onClick={handleDone}
           disabled={isSaving || !startTime || isCommentFocused}
