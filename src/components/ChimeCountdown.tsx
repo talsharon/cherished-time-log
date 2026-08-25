@@ -20,7 +20,7 @@ export function ChimeCountdown() {
     <div className="flex items-center gap-3">
       <div
         className={cn(
-          'font-mono text-2xl md:text-3xl font-light tracking-tight tabular-nums transition-colors',
+          'timer-countdown font-mono font-light tracking-tight tabular-nums transition-colors',
           enabled ? 'text-primary' : 'text-muted-foreground/40'
         )}
       >
