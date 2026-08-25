@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Loader2, Plus, RotateCcw, Sparkles } from 'lucide-react';
 import { TacticalStopwatch } from '@/components/TacticalStopwatch';
+import { ChimeCountdown } from '@/components/ChimeCountdown';
 import { toast } from 'sonner';
 
 const CREATE_NEW_VALUE = '__create_new__';
