@@ -193,7 +193,8 @@ export function ClockTab() {
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-6 relative">
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="clock-layout relative flex min-h-full w-full flex-col items-center justify-center px-6 py-4">
       {/* Generate Insights Button */}
       <Button
         variant="ghost"
@@ -211,12 +212,12 @@ export function ClockTab() {
       </Button>
 
       {/* Chime countdown + toggle */}
-      <div className="flex items-center justify-center mb-4">
+      <div className="flex items-center justify-center mb-[var(--clock-gap-compact)]">
         <ChimeCountdown />
       </div>
 
       {/* Tactical Stopwatch */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-[var(--clock-gap-compact)]">
         <TacticalStopwatch startTime={tacticalStartTime} />
         <Button
           variant="outline"
@@ -229,11 +230,11 @@ export function ClockTab() {
         </Button>
       </div>
 
-      <div className="mb-8">
+      <div className="mb-[var(--clock-gap-roomy)]">
         <Stopwatch startTime={startTime} onStartTimeClick={handleStartTimeClick} />
       </div>
 
-      <div className="w-full max-w-md space-y-4 mb-8 mx-auto">
+      <div className="mb-[var(--clock-gap-roomy)] w-full max-w-md space-y-4">
         <div className="space-y-2">
           <Label className="text-base font-medium text-muted-foreground">What are you up to?</Label>
           <Select value={currentTitle} onValueChange={handleTitleChange}>
@@ -334,7 +335,7 @@ export function ClockTab() {
         </DialogContent>
       </Dialog>
 
-      <div className="w-full max-w-md mx-auto">
+      <div className="w-full max-w-md">
         <Button
           onClick={handleDone}
           disabled={isSaving || !startTime || isCommentFocused}
@@ -379,6 +380,7 @@ export function ClockTab() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
