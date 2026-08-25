@@ -9,6 +9,8 @@ import { Clock, List, LogOut, Lightbulb, Bell, BellOff } from 'lucide-react';
 import { TitlesProvider } from '@/contexts/TitlesContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ChimeSettingsButton } from '@/components/ChimeSettingsButton';
+
 
 export default function Index() {
   const { user, loading, signOut } = useAuth();
@@ -33,7 +35,9 @@ export default function Index() {
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
           <h1 className="text-lg font-semibold text-foreground">Time Tracker</h1>
           <div className="flex items-center gap-1">
+            <ChimeSettingsButton />
             {isSupported && permission !== "granted" && (
+
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
