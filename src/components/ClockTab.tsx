@@ -210,6 +210,11 @@ export function ClockTab() {
         )}
       </Button>
 
+      {/* Chime countdown + toggle */}
+      <div className="flex items-center justify-center mb-4">
+        <ChimeCountdown />
+      </div>
+
       {/* Tactical Stopwatch */}
       <div className="flex items-center gap-3 mb-4">
         <TacticalStopwatch startTime={tacticalStartTime} />
